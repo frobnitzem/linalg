@@ -1,0 +1,9 @@
+#ifndef _LINALG_HH
+#define _LINALG_HH
+
+// the configured options and settings
+#define LINALG_VERSION_MAJOR @linalg_VERSION_MAJOR@
+#define LINALG_VERSION_MINOR @linalg_VERSION_MINOR@
+
+int linalg();
+#endif

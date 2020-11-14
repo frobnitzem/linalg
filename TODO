@@ -1,0 +1,14 @@
+* Set up version control.
+
+* Create a COPYING file with license (see https://opensource.org/licenses)
+
+* Write initial documentation in README.md.
+
+* Customize build.sh and run a test compile.
+
+* Add minimal tests for upstream dependency libraries.
+
+* Integrate testing into the build / pull request process.
+
+* List out minimal desired API for users of this libary.
+
