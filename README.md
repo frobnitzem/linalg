@@ -1,5 +1,5 @@
 # linalg
 
-This project uses a cmake build system and
-contains tests and documentation, but not much else.
+This project implements linear algebra using a tiled design.
+Tiles may be distributed across MPI ranks and/or co-processor devices.
 

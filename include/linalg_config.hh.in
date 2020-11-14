@@ -1,9 +1,10 @@
-#ifndef _LINALG_HH
-#define _LINALG_HH
+#ifndef _LINALG_CONFIG_HH
+#define _LINALG_CONFIG_HH
 
 // the configured options and settings
 #define LINALG_VERSION_MAJOR @linalg_VERSION_MAJOR@
 #define LINALG_VERSION_MINOR @linalg_VERSION_MINOR@
 
-int linalg();
+#cmakedefine ENABLE_CUDA
+
 #endif

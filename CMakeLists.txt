@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
+LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #####################################################################
 # ATTENTION: Replace languages with your own list.                  #
@@ -13,21 +14,49 @@ add_library(linalg_compiler_flags INTERFACE)
 # note: INTERFACE is correct here, since 'linalg_compiler_flags' is a #
 # "target", so things that depend on it see only its "public"       #
 # and "interface" properties.                                       #
-target_compile_features(linalg_compiler_flags INTERFACE cxx_std_11)
+target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 #####################################################################
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+option(ENABLE_CUDA "Build cuda backend" ON)
 option(BUILD_TESTS "Build the tests accompanying this library." ON)
-configure_file(include/linalg.hh.in include/linalg.hh)
+configure_file(include/linalg_config.hh.in include/linalg_config.hh)
 
+#####################################################################
+# ATTENTION: add all your library's static exported header files to this list
+set(LINALG_HEADERS
+    include/linalg_cuda.hh
+    include/linalg.hh
+    include/matrix.hh
+    include/operations.hh)
+#####################################################################
 
 #####################################################################
 # ATTENTION: add all your library's source files to this list
-add_library(linalg src/linalg.cc)
+set(LINALG_SOURCES
+    src/linalg.cc
+    src/matrix.cc
+    src/operations.cc)
 #####################################################################
 
+add_library(linalg ${LINALG_SOURCES})
+
+if(ENABLE_CUDA)
+    enable_language(CUDA)
+    set_target_properties(linalg PROPERTIES
+                          CUDA_STANDARD 14
+                          CUDA_STANDARD_REQUIRED ON)
+    set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 35 50 70 72)
+    find_package(CUDAToolkit REQUIRED)
+    target_link_libraries(linalg CUDA::cudart CUDA::cublas)
+endif()
+find_package(OpenMP   3.1   REQUIRED)
+find_package(MPI      1.0   REQUIRED)
+find_package(cblas    0.3.1 REQUIRED)
+
+
 # library code properties
-target_link_libraries(linalg linalg_compiler_flags)
+target_link_libraries(linalg linalg_compiler_flags cblas MPI::MPI_CXX OpenMP::OpenMP_CXX)
 target_include_directories(linalg
                            PUBLIC
                             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -56,8 +85,8 @@ install(TARGETS ${installable_libs}
 
 #####################################################################
 # ATTENTION: add all your library's installed headers to this list  #
-install(FILES "${PROJECT_BINARY_DIR}/include/linalg.hh" DESTINATION include)
-#install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/util.hh" DESTINATION include)
+install(FILES "${PROJECT_BINARY_DIR}/include/linalg_config.hh" DESTINATION include)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/linalg.hh"  DESTINATION include)
 #####################################################################
 
 # Note: we choose the following location for cmake dependency info:
