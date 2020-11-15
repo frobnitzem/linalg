@@ -8,10 +8,10 @@
     #define CHECKCUBLAS(cmd) assert(0);
     #define CUBLAS_HANDLE_T  int
     #define CUDA_STREAM_T    int
+    #define CUBLAS_THREADS   0
 
 #else // ENABLE_CUDA
 
-#include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 

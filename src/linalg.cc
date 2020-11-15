@@ -2,7 +2,7 @@
 
 namespace Linalg {
 
-Context::Context() : cublas_handle(CUBLAS_THREADS) {
+Context::Context() : cublas_handle(CUBLAS_THREADS), cuda_stream(CUBLAS_THREADS) {
     #ifdef ENABLE_CUDA
     // TODO: bind threads to GPU-s
     for(int i=0; i<CUBLAS_THREADS; i++) {

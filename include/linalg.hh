@@ -15,7 +15,7 @@
 
 #include <mpi.h>
 #include <omp.h>
-#include <f77blas.h>
+#include <blas.hh>
 
 #include "linalg_config.hh"
 #include "linalg_cuda.hh"

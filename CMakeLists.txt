@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+#LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #####################################################################
 # ATTENTION: Replace languages with your own list.                  #
@@ -18,9 +18,8 @@ target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 #####################################################################
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
-option(ENABLE_CUDA "Build cuda backend" ON)
+#option(ENABLE_CUDA "Build cuda backend" ON) # determined from blaspp
 option(BUILD_TESTS "Build the tests accompanying this library." ON)
-configure_file(include/linalg_config.hh.in include/linalg_config.hh)
 
 #####################################################################
 # ATTENTION: add all your library's static exported header files to this list
@@ -41,6 +40,16 @@ set(LINALG_SOURCES
 
 add_library(linalg ${LINALG_SOURCES})
 
+find_package(OpenMP   3.1        REQUIRED)
+find_package(MPI      1.0        REQUIRED)
+find_package(blaspp   2020.10.02 REQUIRED)
+get_target_property(blaspp_interface_compile_definitions blaspp INTERFACE_COMPILE_DEFINITIONS)
+if("${blaspp_interface_compile_definitions}" MATCHES "BLASPP_WITH_CUBLAS")
+    message(STATUS "Enabling CUDA (detected BLASPP_WITH_CUBLAS).")
+    set(ENABLE_CUDA ON)
+else()
+    set(ENABLE_CUDA OFF)
+endif()
 if(ENABLE_CUDA)
     enable_language(CUDA)
     set_target_properties(linalg PROPERTIES
@@ -50,13 +59,9 @@ if(ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(linalg CUDA::cudart CUDA::cublas)
 endif()
-find_package(OpenMP   3.1   REQUIRED)
-find_package(MPI      1.0   REQUIRED)
-find_package(cblas    0.3.1 REQUIRED)
-
 
 # library code properties
-target_link_libraries(linalg linalg_compiler_flags cblas MPI::MPI_CXX OpenMP::OpenMP_CXX)
+target_link_libraries(linalg linalg_compiler_flags blaspp MPI::MPI_CXX OpenMP::OpenMP_CXX)
 target_include_directories(linalg
                            PUBLIC
                             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -68,6 +73,7 @@ set_target_properties(linalg PROPERTIES
                       POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS}
                       )
 
+configure_file(include/linalg_config.hh.in include/linalg_config.hh)
 #add_subdirectory(example)
 if(BUILD_TESTS)
   add_subdirectory(tests)

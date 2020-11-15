@@ -65,9 +65,17 @@ void Context::gemm(const value_t alpha, const TileP<value_t> A,
         callCUDAgemm(get_cublas_handle(), alpha, A, B, beta, C);
     } break;
     default:
-        std::cout << "Error! gemm on " << C->loc << " is not implemented!" << std::endl;
+        printf("Error! gemm on location %d is not implemented!\n", (int)C->loc);
         break;
     }
 }
+
+#define inst_gemm(value_t) template void Context::gemm<value_t>( \
+          const value_t alpha, const TileP<value_t> A, \
+          const TileP<value_t> B, const value_t beta, TileP<value_t> C)
+inst_gemm(float);
+inst_gemm(double);
+inst_gemm(std::complex<float>);
+inst_gemm(std::complex<double>);
 
 }

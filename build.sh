@@ -1,8 +1,8 @@
 #!/bin/bash
 
 LOCALROOT=$PWD/build/inst
-#OPENBLAS=/home/99r/spack/opt/spack/linux-ubuntu18.04-skylake/gcc-7.5.0/openblas-0.3.10-yuemfaycuacsveabwu2xflae74ja5xtd
-OPENBLAS=/home/99r/spack/opt/spack/linux-ubuntu18.04-broadwell/gcc-6.5.0/openblas-0.3.5-ymh7xvk33wxvaqbiv5jjlkyzixldp45y
+BLASPP=/home/99r/spack/opt/spack/linux-ubuntu18.04-skylake/gcc-8.4.0/blaspp-2020.10.02-sfs5es6iyemz3y4ynbbfn7z4ea4rthlh
+CUDA_COMPILER=/home/99r/spack/opt/spack/linux-ubuntu18.04-skylake/gcc-8.4.0/cuda-11.1.0-jwbmvvabp4ldton37gwq7v577ldkxkfw/bin/nvcc
 
 set -e
 if [ ! -s build.sh ]; then
@@ -13,7 +13,10 @@ fi
 [ -d build ] && rm -fr build
 mkdir build
 cd build
-cmake -DCMAKE_PREFIX_PATH=$OPENBLAS -DCMAKE_INSTALL_PREFIX=$LOCALROOT ..
+cmake -DCMAKE_CXX_COMPILER=g++-8 \
+      -DCMAKE_CUDA_COMPILER=$CUDA_COMPILER \
+      -DCMAKE_PREFIX_PATH=$BLASPP \
+      -DCMAKE_INSTALL_PREFIX=$LOCALROOT ..
 make -j4
 
 (cd tests && ctest -N)

@@ -1,3 +1,7 @@
+* Change blas dependency over to blaspp
+  - run timing tests from blaspp
+  - determine best cmake import strategy
+
 * Add minimal tests for upstream dependency libraries.
 
 * Integrate testing into the build / pull request process.
