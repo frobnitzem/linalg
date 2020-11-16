@@ -6,8 +6,6 @@
 // stubs
     #define CHECKCUDA(cmd)   assert(0);
     #define CHECKCUBLAS(cmd) assert(0);
-    #define CUBLAS_HANDLE_T  int
-    #define CUDA_STREAM_T    int
     #define CUBLAS_THREADS   0
 
 #else // ENABLE_CUDA
@@ -16,8 +14,6 @@
 #include <cublas_v2.h>
 
 #define CUBLAS_THREADS  omp_get_max_threads()
-#define CUBLAS_HANDLE_T cublasHandle_t
-#define CUDA_STREAM_T   cudaStream_t
 
 #define CHECKCUDA(cmd) do {                         \
   cudaError_t e = cmd;                              \

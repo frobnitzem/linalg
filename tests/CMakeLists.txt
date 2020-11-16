@@ -15,5 +15,5 @@ if(ENABLE_CUDA)
 
   add_executable(gemm gemm.cc)
   target_link_libraries(gemm PUBLIC linalg)
-  add_test(NAME gemm COMMAND gemm)
+  add_test(NAME gemm COMMAND gemm 200 500 100)
 endif()

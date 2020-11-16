@@ -1,0 +1,5 @@
+Version 0.1:
+	* Added dependency on blaspp
+
+	* Minimal test for cuda, openmp, and blaspp.
+

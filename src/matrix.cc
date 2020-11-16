@@ -10,10 +10,14 @@ Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t lda_, Place loc_)
     const size_t sz = lda*n*sizeof(value_t);
     switch(loc) {
     case Place::Host: {
+        #ifdef ENABLE_CUDA
+        data = blas::device_malloc_pinned<value_t>(lda*n);
+        #else
         data = (value_t *)malloc(sz);
+        #endif
     } break;
     case Place::CUDA: {
-        CHECKCUDA(cudaMalloc((void **)&data, sz));
+        data = blas::device_malloc<value_t>(lda*n);
     } break;
     default:
         assert(0);
@@ -41,10 +45,14 @@ Tile<value_t>::~Tile() {
     if(own_data) {
         switch(loc) {
         case Place::Host: {
+            #ifdef ENABLE_CUDA
+            blas::device_free_pinned((void *)data);
+            #else
             free(data);
+            #endif
         } break;
         case Place::CUDA: {
-            CHECKCUDA(cudaFree(data));
+            blas::device_free((void *)data);
         } break;
         default:
             assert(0);
@@ -71,7 +79,7 @@ void Tile<value_t>::fill(const value_t x) {
     int64_t k=0;
     switch(loc) {
     case Place::CUDA: {
-        if(x != (value_t)0.0) { // TODO
+        if(x != (value_t)0.0) { // TODO: use blas to do this (requires Context)
             printf("nonzero device fill is not implemented.\n");
             assert(0);
         }
