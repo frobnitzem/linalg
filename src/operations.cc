@@ -13,27 +13,24 @@ void Context::gemm(const value_t alpha, const TileP<value_t> A,
                             "gemm called on tiles from different locations");
 
     switch(C->loc) {
-    case Place::Host: {
+    case HostLoc: {
         blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                     C->m, C->n, A->n,
-                    -1.0, A->data, A->lda,
-                          B->data, B->lda,
-                     1.0, C->data, C->lda );
+                    -1.0, A->data, A->stride,
+                          B->data, B->stride,
+                     1.0, C->data, C->stride );
 
     } break;
-    case Place::CUDA: {
+    default: {
         #ifndef ENABLE_CUDA
         assert(0);
         #endif
         blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                     C->m, C->n, A->n,
-                    -1.0, A->data, A->lda,
-                          B->data, B->lda,
-                     1.0, C->data, C->lda, get_queue() );
+                    -1.0, A->data, A->stride,
+                          B->data, B->stride,
+                     1.0, C->data, C->stride, get_queue(C->loc) );
     } break;
-    default:
-        printf("Error! gemm on location %d is not implemented!\n", (int)C->loc);
-        break;
     }
 }
 

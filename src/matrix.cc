@@ -5,70 +5,69 @@ namespace Linalg {
 
 // Root tile holding data.
 template <typename value_t>
-Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t lda_, Place loc_)
-       : loc(loc_), m(m_), n(n_), lda(lda_), own_data(true) {
-    const size_t sz = lda*n*sizeof(value_t);
+Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t stride_, Place loc_)
+       : loc(loc_), m(m_), n(n_), stride(stride_), own_data(true) {
+    const size_t sz = stride*n*sizeof(value_t);
     switch(loc) {
-    case Place::Host: {
+    case HostLoc: {
         #ifdef ENABLE_CUDA
-        data = blas::device_malloc_pinned<value_t>(lda*n);
+        data = blas::device_malloc_pinned<value_t>(stride*n);
         #else
         data = (value_t *)malloc(sz);
         #endif
     } break;
-    case Place::CUDA: {
-        data = blas::device_malloc<value_t>(lda*n);
+    default: {
+        blas::set_device(loc);
+        data = blas::device_malloc<value_t>(stride*n);
     } break;
-    default:
-        assert(0);
     }
 }
 
 // Root tile holding external data.
 template <typename value_t>
-Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t lda_, value_t *data_, Place loc_)
-       : loc(loc_), m(m_), n(n_), lda(lda_), data(data_), own_data(false) {}
+Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t stride_, value_t *data_, Place loc_)
+       : loc(loc_), m(m_), n(n_), stride(stride_), data(data_), own_data(false) {}
 
 // m,n submatrix starting at index i,j of parent tile.
 template <typename value_t>
 Tile<value_t>::Tile(int64_t m_, int64_t n_,
          std::shared_ptr<Tile<value_t> > parent_, int64_t i, int64_t j)
-       : loc(parent_->loc), m(m_), n(n_), lda(parent_->lda),
-         data(parent_->data + i+lda*j),
+       : loc(parent_->loc), m(m_), n(n_), stride(parent_->stride),
+         data(parent_->data + i+stride*j),
          own_data(false), parent(parent_) {
-     //printf("Subtile %ld,%ld,%ld @ %ld,%ld\n", m,n,lda, i,j);
+     //printf("Subtile %ld,%ld,%ld @ %ld,%ld\n", m,n,stride, i,j);
 }
 
 template <typename value_t>
 Tile<value_t>::~Tile() {
-        //printf("Called dtor for Tile %ld %ld %ld (%d)\n", m, n, lda, own_data);
+        //printf("Called dtor for Tile %ld %ld %ld (%d)\n", m, n, stride, own_data);
     if(own_data) {
         switch(loc) {
-        case Place::Host: {
+        case HostLoc: {
             #ifdef ENABLE_CUDA
             blas::device_free_pinned((void *)data);
             #else
             free(data);
             #endif
         } break;
-        case Place::CUDA: {
+        default: {
+            // FIXME: set device
+            blas::set_device(loc);
             blas::device_free((void *)data);
         } break;
-        default:
-            assert(0);
         }
     }
 }
 
 template <typename value_t>
 void Tile<value_t>::print() {
-    if(loc != Place::Host) { // TODO
+    if(loc != HostLoc) { // TODO
         printf("device tile\n");
         return;
     }
     for(int64_t i=0; i<m; i++) {
         for(int64_t j=0; j<n; j++) {
-            printf("%.1f ", data[j*lda+i]);
+            printf("%.1f ", data[j*stride+i]);
         }
         printf("\n");
     }
@@ -78,24 +77,23 @@ template <typename value_t>
 void Tile<value_t>::fill(const value_t x) {
     int64_t k=0;
     switch(loc) {
-    case Place::CUDA: {
+    case HostLoc: {
+        #pragma omp parallel for collapse(2)
+        for(int64_t j=0; j<n; j++) {
+            for(int64_t i=0; i<m; i++) {
+                data[j*stride+i] = x;
+            }
+        }
+    } break;
+    default: {
         if(x != (value_t)0.0) { // TODO: use blas to do this (requires Context)
             printf("nonzero device fill is not implemented.\n");
             assert(0);
         }
-        CHECKCUDA( cudaMemset(data, 0, lda*n*sizeof(value_t)) );
+        
+        CHECKCUDA( cudaMemset(data, 0, stride*n*sizeof(value_t)) );
         return;
     } break;
-    case Place::Host: { 
-        #pragma omp parallel for collapse(2)
-        for(int64_t j=0; j<n; j++) {
-            for(int64_t i=0; i<m; i++) {
-                data[j*lda+i] = x;
-            }
-        }
-    } break;
-    default:
-        assert(0);
     }
 }
 

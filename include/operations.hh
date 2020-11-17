@@ -5,11 +5,13 @@
 
 // Per-thread context is required by CUDA impl.
 struct Context {
-    std::vector<blas::Queue> queue; // for device streams
+    std::deque<blas::Queue> queue; // for device streams
+    // TODO: change to std::vector once upstream functionality is present
     Context();
 
-    inline blas::Queue &get_queue() {
-        return queue[omp_get_thread_num()];
+    inline blas::Queue &get_queue(Place loc) {
+        assert(loc >= 0 && loc < queue.size());
+        return queue[loc];
     }
     template <typename value_t>
     void gemm(const value_t alpha, const TileP<value_t> A,

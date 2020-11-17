@@ -17,9 +17,9 @@ int main(int argc, char *argv[]) {
 
     Linalg::Context c;
     //blas::Queue q;
-    auto A = std::make_shared<Linalg::Tile<T> >(m, k, m, Linalg::Place::CUDA);
-    auto B = std::make_shared<Linalg::Tile<T> >(k, n, k, Linalg::Place::CUDA);
-    auto C = std::make_shared<Linalg::Tile<T> >(m, n, m, Linalg::Place::CUDA);
+    auto A = std::make_shared<Linalg::Tile<T> >(m, k, m, 0); // place on device 0 = gpu 0
+    auto B = std::make_shared<Linalg::Tile<T> >(k, n, k, 0);
+    auto C = std::make_shared<Linalg::Tile<T> >(m, n, m, 0);
 
     double time = omp_get_wtime();
     c.gemm<T>(-1.0, A, B, 1.0, C);

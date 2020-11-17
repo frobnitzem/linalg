@@ -6,14 +6,11 @@
 // stubs
     #define CHECKCUDA(cmd)   assert(0);
     #define CHECKCUBLAS(cmd) assert(0);
-    #define CUBLAS_THREADS   0
 
 #else // ENABLE_CUDA
 
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-
-#define CUBLAS_THREADS  omp_get_max_threads()
 
 #define CHECKCUDA(cmd) do {                         \
   cudaError_t e = cmd;                              \

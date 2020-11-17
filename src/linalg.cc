@@ -2,10 +2,13 @@
 
 namespace Linalg {
 
-Context::Context() : queue(CUBLAS_THREADS) {
+Context::Context() {
     #ifdef ENABLE_CUDA
-    blas::Device device = 0;
-    // TODO: set queue devices explicitly
+    int devices;
+    CHECKCUDA( cudaGetDeviceCount(&devices) );
+    for(int loc=0; loc < devices; loc++) {
+        queue.emplace_back((blas::Device)loc, 0);
+    }
     #endif
 }
 

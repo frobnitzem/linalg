@@ -18,16 +18,17 @@ template <typename value_t>
 struct Tile {
     using value_type = value_t;
     const Place loc;
-    const int64_t m, n, lda;
+    const int64_t m, n, stride;
     value_t *data;
     const bool own_data; // true only for some root tiles
     const std::shared_ptr<Tile<value_t> > parent;
 
-    // Root tile holding Host data.
-    Tile(int64_t m, int64_t n, int64_t lda, Place);
-    // Root tile holding external data.
-    Tile(int64_t m, int64_t n, int64_t lda, value_t *data, Place);
-    // m,n submatrix starting at index i,j of parent tile.
+    // Root tile managing data pointer.
+    Tile(int64_t m, int64_t n, int64_t stride, Place);
+    // Root tile holding external data pointer.
+    Tile(int64_t m, int64_t n, int64_t stride, value_t *data, Place);
+    // m,n submatrix starting at index i,j of parent tile
+    //     (points to external data)
     Tile(int64_t m, int64_t n,
          std::shared_ptr<Tile<value_t> > parent, int64_t i, int64_t j);
     ~Tile();

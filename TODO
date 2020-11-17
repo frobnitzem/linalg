@@ -2,3 +2,11 @@
 
 * List out minimal desired API for users of this libary.
 
+* make Tile interface more slate-like (transpose device num, etc.)
+
+* speed test tile gemm
+
+* add tile copy/nccl-reduce functionality
+
+* create A' B kernel
+

@@ -1,5 +1,6 @@
 #include <linalg.hh>
 
 int main(int argc, char *argv[]) {
-    return linalg();
+    Linalg::Context c;
+    return 0;
 }

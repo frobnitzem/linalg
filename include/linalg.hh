@@ -10,6 +10,7 @@
 #include <memory>
 #include <functional>
 #include <vector>
+#include <deque>
 #include <map>
 #include <complex>
 
@@ -22,9 +23,11 @@
 
 namespace Linalg {
 
-enum class Place {
+/*enum class Place {
     Host, PHI, CUDA, HIP
-};
+};*/
+using Place = int;
+static const int HostLoc = -1;
 
 // Create a Subgroup with 2D Cartesian Topology
 struct CartGroup {
