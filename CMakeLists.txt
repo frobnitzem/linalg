@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.18)
 #LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #####################################################################
@@ -18,7 +18,7 @@ target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 #####################################################################
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
-#option(ENABLE_CUDA "Build cuda backend" ON) # determined from blaspp
+option(DISABLE_CUDA "Don't use cuda backend, regardless of blaspp support." OFF)
 option(BUILD_TESTS "Build the tests accompanying this library." ON)
 
 #####################################################################
@@ -36,6 +36,8 @@ set(LINALG_SOURCES
     src/linalg.cc
     src/matrix.cc
     src/operations.cc)
+set(LINALG_CUDA_SOURCES
+    src/set_cuda.cu)
 #####################################################################
 
 add_library(linalg ${LINALG_SOURCES})
@@ -44,7 +46,7 @@ find_package(OpenMP   3.1        REQUIRED)
 find_package(MPI      1.0        REQUIRED)
 find_package(blaspp   2020.10.02 REQUIRED)
 get_target_property(blaspp_interface_compile_definitions blaspp INTERFACE_COMPILE_DEFINITIONS)
-if("${blaspp_interface_compile_definitions}" MATCHES "BLASPP_WITH_CUBLAS")
+if(NOT DISABLE_CUDA AND "${blaspp_interface_compile_definitions}" MATCHES "BLASPP_WITH_CUBLAS")
     message(STATUS "Enabling CUDA (detected BLASPP_WITH_CUBLAS).")
     set(ENABLE_CUDA ON)
 else()
@@ -58,6 +60,8 @@ if(ENABLE_CUDA)
     set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 35 50 70 72)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(linalg CUDA::cudart CUDA::cublas)
+
+    target_sources(linalg PRIVATE ${LINALG_CUDA_SOURCES})
 endif()
 
 # library code properties

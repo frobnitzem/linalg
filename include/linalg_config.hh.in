@@ -7,4 +7,13 @@
 
 #cmakedefine ENABLE_CUDA
 
+#include <complex>
+
+// Instantiate a macro for all the relevant value types.
+#define instantiate_template(inst_pattern) \
+  inst_pattern(float); \
+  inst_pattern(double); \
+  inst_pattern(std::complex<float>); \
+  inst_pattern(std::complex<double>);
+
 #endif

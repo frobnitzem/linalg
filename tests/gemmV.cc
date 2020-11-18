@@ -1,3 +1,4 @@
+// Same as gemm, but using TileView-s.
 #include <linalg.hh>
 #include <blas/flops.hh>
 #include <stdio.h>
@@ -23,9 +24,12 @@ int main(int argc, char *argv[]) {
 
     Linalg::Context c;
     //blas::Queue q;
-    auto A = std::make_shared<Linalg::Tile<T> >(m, k, m, loc);
-    auto B = std::make_shared<Linalg::Tile<T> >(k, n, k, loc);
-    auto C = std::make_shared<Linalg::Tile<T> >(m, n, m, loc);
+    auto At = std::make_shared<Linalg::Tile<T> >(m, k, m, loc);
+    auto Bt = std::make_shared<Linalg::Tile<T> >(k, n, k, loc);
+    auto Ct = std::make_shared<Linalg::Tile<T> >(m, n, m, loc);
+    auto A = Linalg::TileView<T>(At);
+    auto B = Linalg::TileView<T>(Bt);
+    auto C = Linalg::TileView<T>(Ct);
     c.set<T>(A, 1.0);
     c.set<T>(B, 0.5);
     c.set<T>(C, 0.0);

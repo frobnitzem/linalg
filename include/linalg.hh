@@ -12,7 +12,6 @@
 #include <vector>
 #include <deque>
 #include <map>
-#include <complex>
 
 #include <mpi.h>
 #include <omp.h>

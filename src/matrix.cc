@@ -74,30 +74,6 @@ void Tile<value_t>::print() {
 }
 
 template <typename value_t>
-void Tile<value_t>::fill(const value_t x) {
-    int64_t k=0;
-    switch(loc) {
-    case HostLoc: {
-        #pragma omp parallel for collapse(2)
-        for(int64_t j=0; j<n; j++) {
-            for(int64_t i=0; i<m; i++) {
-                data[j*stride+i] = x;
-            }
-        }
-    } break;
-    default: {
-        if(x != (value_t)0.0) { // TODO: use blas to do this (requires Context)
-            printf("nonzero device fill is not implemented.\n");
-            assert(0);
-        }
-        
-        CHECKCUDA( cudaMemset(data, 0, stride*n*sizeof(value_t)) );
-        return;
-    } break;
-    }
-}
-
-template <typename value_t>
 Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
            const std::function<int64_t(int64_t)> inTileMb_,
            const std::function<int64_t(int64_t)> inTileNb_,
@@ -143,7 +119,6 @@ TileP<value_t> Matrix<value_t>::alloc(Place loc) {
             int64_t tm = inTileMb(i);
             TileP<value_t> x = std::make_shared<Tile<value_t> >(tm, tn, root, m, n);
             tiles[idx(i,j)] = x;
-            x->fill(0.0);
             m += tm;
         }
         n += tn;
@@ -151,12 +126,8 @@ TileP<value_t> Matrix<value_t>::alloc(Place loc) {
     return root;
 }
 
-template class Matrix<float>;
-template class Matrix<double>;
-template class Matrix<std::complex<float>>;
-template class Matrix<std::complex<double>>;
-template class Tile<float>;
-template class Tile<double>;
-template class Tile<std::complex<float>>;
-template class Tile<std::complex<double>>;
+#define inst_Matrix(value_t) template class Matrix<value_t>
+instantiate_template(inst_Matrix)
+//#define inst_Tile(value_t) template class Tile<value_t>
+//instantiate_template(inst_Tile)
 }
