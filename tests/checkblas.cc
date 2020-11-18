@@ -32,6 +32,11 @@ void run( int m, int n, int k ) {
 //------------------------------------------------------------------------------
 int main( int argc, char** argv ) {
     int m = 100, n = 200, k = 50;
+    if(argc == 4) {
+        m = atol(argv[1]);
+        n = atol(argv[2]);
+        k = atol(argv[3]);
+    }
     printf( "run< float >( %d, %d, %d )\n", m, n, k );
     run< float  >( m, n, k );
 

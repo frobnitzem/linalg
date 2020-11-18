@@ -23,7 +23,7 @@ void Context::set_cuda(TileP<T> t, const T a) {
     int numSMs; // the V100 has 160 SMs, each with 32 "CUDA cores"
     CHECKCUDA( cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, device) );
     numSMs *= 32;
-    size_t N = t->stride*t->m;
+    size_t N = (size_t)t->stride * t->n;
     size_t maxblk = (N+31)/32;
     if(maxblk < numSMs) numSMs = maxblk;
 
