@@ -43,7 +43,7 @@ set(LINALG_SOURCES
     src/matrix.cc
     src/operations.cc)
 set(LINALG_CUDA_SOURCES
-    src/set_cuda.cu)
+    src/operations_cuda.cu)
 #####################################################################
 
 add_library(linalg ${LINALG_SOURCES})
@@ -67,7 +67,7 @@ if(ENABLE_CUDA)
     set_target_properties(linalg PROPERTIES
                           CUDA_STANDARD 14
                           CUDA_STANDARD_REQUIRED ON)
-    set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 35 50 70 72)
+    set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 75)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(linalg CUDA::cudart CUDA::cublas)
 

@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         c.copy(B, A);
         c.sync();
         time = omp_get_wtime() - time;
-        printf("copy time = %f sec., GB/s = %f\n", time, sizeof(T)*m*n / time);
+        printf("copy time = %f sec., MB/s = %f\n", time, sizeof(T)*m*n / (time*1024*1024));
     }
     //blas::device_getmatrix(m, n, dC, ldc, C.data(), ldc, queue);
     //c.sync();

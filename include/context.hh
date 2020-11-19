@@ -25,8 +25,13 @@ struct Context {
     template <typename value_t>
     void set(TileView<value_t> A, const value_t a) { set(A.t, a); };
 
+    template <typename dst_t, typename src_t>
+    void copy(TileView<dst_t> dst, const TileView<src_t> src);
+
     #ifdef ENABLE_CUDA
     template <typename value_t>
-    void set_cuda(TileP<value_t> A, const value_t);
+    void set_cuda(TileP<value_t>, const value_t);
+    template <typename dst_t, typename src_t>
+    void copy_cuda(TileView<dst_t>, const TileView<src_t>);
     #endif
 };

@@ -116,10 +116,60 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
     default: assert(0);
     }
 }
-
 #define inst_gemmV(value_t) template void Context::gemm<value_t>( \
           const value_t alpha, const TileView<value_t> A, \
           const TileView<value_t> B, const value_t beta, TileView<value_t> C)
 instantiate_template(inst_gemmV)
+
+template <typename dst_t, typename src_t>
+void Context::copy(TileView<dst_t> dst, const TileView<src_t> src) {
+    blas_error_if_msg(dst.mb() != src.mb() || dst.nb() != src.nb(),
+                      "copy requires identical tile dimensions");
+    blas_error_if_msg(dst.device() != src.device(),
+                      "copy called on tiles from different locations");
+    blas_error_if_msg( (dst.op() == blas::Op::ConjTrans) != (src.op() == blas::Op::ConjTrans),
+                      "copy can't yet do complex conjugate");
+    blas_error_if_msg(dst.uplo() != blas::Uplo::General || src.uplo() != blas::Uplo::General,
+                      "copy can't yet do uplo != General");
+
+    switch(dst.device()) {
+    case Place::Host: {
+        // same transpose status
+        if( (src.op() == blas::Op::NoTrans) == (dst.op() == blas::Op::NoTrans) ) {
+            #pragma omp parallel for collapse(2)
+            for(int j=0; j<dst.t->n; j++) {
+                for(int i=0; i<dst.t->m; i++) {
+                        dst.t->at(i,j) = src.t->at(i,j);
+                }
+            }
+        } else { // transpose-copy
+            #pragma omp parallel for collapse(2)
+            for(int j=0; j<dst.t->n; j++) {
+                for(int i=0; i<dst.t->m; i++) {
+                        dst.t->at(i,j) = src.t->at(j,i);
+                }
+            }
+        }
+    } break;
+    case Place::CUDA: {
+        #ifndef ENABLE_CUDA
+        assert(0);
+        #else
+        copy_cuda<dst_t, src_t>(dst, src);
+        #endif
+    } break;
+    default: assert(0);
+    }
+}
+#define inst_copyV2(dst_t, src_t) template void Context::copy<dst_t, src_t>( \
+                          TileView<dst_t>, const TileView<src_t>)
+#define inst_copyV(dst_t) inst_copyV2(dst_t, float); \
+                          inst_copyV2(dst_t, double)
+instantiate_template(inst_copyV)
+inst_copyV2(std::complex<float>, std::complex<float>);
+inst_copyV2(std::complex<float>, std::complex<double>);
+inst_copyV2(std::complex<double>, std::complex<float>);
+inst_copyV2(std::complex<double>, std::complex<double>);
+
 }
 
