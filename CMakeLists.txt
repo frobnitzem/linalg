@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-#LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 #####################################################################
 # ATTENTION: Replace languages with your own list.                  #
@@ -18,22 +18,28 @@ target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 #####################################################################
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
-option(DISABLE_CUDA "Don't use cuda backend, regardless of blaspp support." OFF)
-option(BUILD_TESTS "Build the tests accompanying this library." ON)
+option(ENABLE_NCCL       "Use the NCCL communication library" ON)
+option(DISABLE_CUDA      "Don't use cuda backend, regardless of blaspp support." OFF)
+option(BUILD_TESTS       "Build the tests accompanying this library." ON)
 
 #####################################################################
 # ATTENTION: add all your library's static exported header files to this list
 set(LINALG_HEADERS
-    include/linalg_cuda.hh
     include/linalg.hh
+    include/linalg_cuda.hh
+    include/linalg_nccl.hh
+    include/tile.hh
+    include/comm.hh
     include/matrix.hh
-    include/operations.hh)
+    include/context.hh)
+
 #####################################################################
 
 #####################################################################
 # ATTENTION: add all your library's source files to this list
 set(LINALG_SOURCES
-    src/linalg.cc
+    src/context.cc
+    src/comm.cc
     src/matrix.cc
     src/operations.cc)
 set(LINALG_CUDA_SOURCES
@@ -51,6 +57,10 @@ if(NOT DISABLE_CUDA AND "${blaspp_interface_compile_definitions}" MATCHES "BLASP
     set(ENABLE_CUDA ON)
 else()
     set(ENABLE_CUDA OFF)
+    if(ENABLE_NCCL)
+        message(STATUS "Disabling NCCL because CUDA is not enabled")
+    endif()
+    set(ENABLE_NCCL OFF)
 endif()
 if(ENABLE_CUDA)
     enable_language(CUDA)
@@ -62,6 +72,10 @@ if(ENABLE_CUDA)
     target_link_libraries(linalg CUDA::cudart CUDA::cublas)
 
     target_sources(linalg PRIVATE ${LINALG_CUDA_SOURCES})
+endif()
+if(ENABLE_NCCL)
+    find_package(NCCL REQUIRED)
+    target_link_libraries(linalg NCCL)
 endif()
 
 # library code properties
@@ -96,7 +110,8 @@ install(TARGETS ${installable_libs}
 #####################################################################
 # ATTENTION: add all your library's installed headers to this list  #
 install(FILES "${PROJECT_BINARY_DIR}/include/linalg_config.hh" DESTINATION include)
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/linalg.hh"  DESTINATION include)
+#install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/linalg.hh"  DESTINATION include)
+install(FILES ${LINALG_HEADERS} DESTINATION include)
 #####################################################################
 
 # Note: we choose the following location for cmake dependency info:

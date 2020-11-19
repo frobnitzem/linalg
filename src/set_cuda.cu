@@ -27,7 +27,7 @@ void Context::set_cuda(TileP<T> t, const T a) {
     size_t maxblk = (N+31)/32;
     if(maxblk < numSMs) numSMs = maxblk;
 
-    cudaStream_t stream = queue[device].stream();
+    cudaStream_t stream = get_queue().stream();
     set_cuda_kernel<<<numSMs, 32, 0, stream >>>(N, a, t->data);
 }
 #define inst_set_cuda(T) template void Context::set_cuda(TileP<T> t, const T a)

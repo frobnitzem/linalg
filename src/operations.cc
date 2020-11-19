@@ -15,7 +15,7 @@ void Context::gemm(const value_t alpha, const TileP<value_t> A,
                             "gemm called on tiles from different locations");
 
     switch(C->loc) {
-    case HostLoc: {
+    case Place::Host: {
         blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                     C->m, C->n, A->n,
                     alpha, A->data, A->stride,
@@ -23,7 +23,7 @@ void Context::gemm(const value_t alpha, const TileP<value_t> A,
                     beta,  C->data, C->stride );
 
     } break;
-    default: {
+    case Place::CUDA: {
         #ifndef ENABLE_CUDA
         assert(0);
         #endif
@@ -31,8 +31,9 @@ void Context::gemm(const value_t alpha, const TileP<value_t> A,
                     C->m, C->n, A->n,
                     alpha, A->data, A->stride,
                            B->data, B->stride,
-                    beta,  C->data, C->stride, get_queue(C->loc) );
+                    beta,  C->data, C->stride, get_queue() );
     } break;
+    default: assert(0);
     }
 }
 
@@ -44,7 +45,7 @@ instantiate_template(inst_gemm)
 template <typename value_t>
 void Context::set(TileP<value_t> t, const value_t a) {
     switch(t->loc) {
-    case HostLoc: {
+    case Place::Host: {
         #pragma omp parallel for collapse(2)
         for(int64_t j=0; j<t->n; j++) {
             for(int64_t i=0; i<t->m; i++) {
@@ -52,13 +53,14 @@ void Context::set(TileP<value_t> t, const value_t a) {
             }
         }
     } break;
-    default: {
-        #ifdef ENABLE_CUDA
-        set_cuda(t, a);
-        #else
+    case Place::CUDA: {
+        #ifndef ENABLE_CUDA
         assert(0);
+        #else
+        set_cuda(t, a);
         #endif
     } break;
+    default: assert(0);
     }
 }
 #define inst_set(value_t) template void Context::set<value_t>( \
@@ -93,7 +95,7 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
     }
 
     switch(C.device()) {
-    case HostLoc: {
+    case Place::Host: {
         blas::gemm( blas::Layout::ColMajor, Ap.op(), Bp.op(),
                     Ap.mb(), Bp.nb(), Ap.nb(),
                     alpha, Ap.data(), Ap.stride(),
@@ -101,7 +103,7 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
                      beta, C.data(), C.stride() );
 
     } break;
-    default: {
+    case Place::CUDA: {
         #ifndef ENABLE_CUDA
         assert(0);
         #endif
@@ -109,8 +111,9 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
                     Ap.mb(), Bp.nb(), Ap.nb(),
                     alpha, Ap.data(), Ap.stride(),
                            Bp.data(), Bp.stride(),
-                     beta, C.data(), C.stride(), get_queue(C.device()) );
+                     beta, C.data(), C.stride(), get_queue() );
     } break;
+    default: assert(0);
     }
 }
 

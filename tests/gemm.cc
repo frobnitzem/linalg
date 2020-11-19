@@ -6,9 +6,9 @@
 #include <bits/stdc++.h>
 
 #ifdef ENABLE_CUDA
-const Linalg::Place loc = 0;
+const Linalg::Place loc = Linalg::Place::CUDA;
 #else
-const Linalg::Place loc = Linalg::HostLoc;
+const Linalg::Place loc = Linalg::Place::Host;
 #endif
 
 int main(int argc, char *argv[]) {
@@ -32,13 +32,13 @@ int main(int argc, char *argv[]) {
     c.set<T>(A, 1.0);
     c.set<T>(B, 0.5);
     c.set<T>(C, 0.0);
-    c.queue[0].sync();
+    c.sync();
 
     double gflop = blas::Gflop <T>::gemm( m, n, k );
     for(int i=0; i<ntests; i++) {
         double time = omp_get_wtime();
         c.gemm<T>(-1.0, A, B, 1.0, C);
-        c.queue[0].sync();
+        c.sync();
         time = omp_get_wtime() - time;
         printf("GEMM time = %f sec.   gflops = %f\n", time, gflop / time);
         results[i] = time;

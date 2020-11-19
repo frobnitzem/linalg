@@ -9,17 +9,17 @@ Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t stride_, Place loc_)
        : loc(loc_), m(m_), n(n_), stride(stride_), own_data(true) {
     const size_t sz = stride*n*sizeof(value_t);
     switch(loc) {
-    case HostLoc: {
+    case Place::Host: {
         #ifdef ENABLE_CUDA
         data = blas::device_malloc_pinned<value_t>(stride*n);
         #else
         data = (value_t *)malloc(sz);
         #endif
     } break;
-    default: {
-        blas::set_device(loc);
+    case Place::CUDA: {
         data = blas::device_malloc<value_t>(stride*n);
     } break;
+    default: assert(0);
     }
 }
 
@@ -41,27 +41,28 @@ Tile<value_t>::Tile(int64_t m_, int64_t n_,
 template <typename value_t>
 Tile<value_t>::~Tile() {
         //printf("Called dtor for Tile %ld %ld %ld (%d)\n", m, n, stride, own_data);
-    if(own_data) {
-        switch(loc) {
-        case HostLoc: {
-            #ifdef ENABLE_CUDA
-            blas::device_free_pinned((void *)data);
-            #else
-            free(data);
-            #endif
-        } break;
-        default: {
-            // FIXME: set device
-            blas::set_device(loc);
-            blas::device_free((void *)data);
-        } break;
-        }
+    if(!own_data) {
+        return;
+    }
+
+    switch(loc) {
+    case Place::Host: {
+        #ifdef ENABLE_CUDA
+        blas::device_free_pinned((void *)data);
+        #else
+        free(data);
+        #endif
+    } break;
+    case Place::CUDA: {
+        blas::device_free((void *)data);
+    } break;
+    default: assert(0);
     }
 }
 
 template <typename value_t>
 void Tile<value_t>::print() {
-    if(loc != HostLoc) { // TODO
+    if(loc != Place::Host) { // TODO
         printf("device tile\n");
         return;
     }

@@ -16,4 +16,22 @@
   inst_pattern(std::complex<float>); \
   inst_pattern(std::complex<double>);
 
+#define MPICHECK(cmd) do {                          \
+  int e = cmd;                                      \
+  if( e != MPI_SUCCESS ) {                          \
+    printf("Failed: MPI error %s:%d '%d'\n",        \
+        __FILE__,__LINE__, e);   \
+    exit(EXIT_FAILURE);                             \
+  }                                                 \
+} while(0)
+
+template<typename T>
+struct is_complex_t : public std::false_type {
+    using value_type = T;
+};
+template<typename T>
+struct is_complex_t<std::complex<T>> : public std::true_type {
+    using value_type = T;
+};
+
 #endif
