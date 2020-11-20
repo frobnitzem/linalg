@@ -6,8 +6,19 @@
 #define LINALG_VERSION_MINOR @linalg_VERSION_MINOR@
 
 #cmakedefine ENABLE_CUDA
+#ifdef ENABLE_CUDA
+// CMakeLists enforces either both or neither.
+#define ENABLE_NCCL
+#endif
 
 #include <complex>
+#include <assert.h>
+
+#ifdef DEBUG
+#define debug_assert(x) assert(x)
+#else
+#define debug_assert(x)
+#endif
 
 // Instantiate a macro for all the relevant value types.
 #define instantiate_template(inst_pattern) \

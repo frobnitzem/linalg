@@ -25,6 +25,8 @@ struct Context {
     template <typename value_t>
     void set(TileView<value_t> A, const value_t a) { set(A.t, a); };
 
+    template <typename value_t>
+    void copy(TileP<value_t> dst, TileP<value_t>src);
     template <typename dst_t, typename src_t>
     void copy(TileView<dst_t> dst, const TileView<src_t> src);
 
@@ -35,3 +37,4 @@ struct Context {
     void copy_cuda(TileView<dst_t>, const TileView<src_t>);
     #endif
 };
+using ContextP = std::shared_ptr<Context>;

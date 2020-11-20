@@ -18,7 +18,6 @@ target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 #####################################################################
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
-option(ENABLE_NCCL       "Use the NCCL communication library" ON)
 option(DISABLE_CUDA      "Don't use cuda backend, regardless of blaspp support." OFF)
 option(BUILD_TESTS       "Build the tests accompanying this library." ON)
 
@@ -57,10 +56,6 @@ if(NOT DISABLE_CUDA AND "${blaspp_interface_compile_definitions}" MATCHES "BLASP
     set(ENABLE_CUDA ON)
 else()
     set(ENABLE_CUDA OFF)
-    if(ENABLE_NCCL)
-        message(STATUS "Disabling NCCL because CUDA is not enabled")
-    endif()
-    set(ENABLE_NCCL OFF)
 endif()
 if(ENABLE_CUDA)
     enable_language(CUDA)
@@ -72,8 +67,7 @@ if(ENABLE_CUDA)
     target_link_libraries(linalg CUDA::cudart CUDA::cublas)
 
     target_sources(linalg PRIVATE ${LINALG_CUDA_SOURCES})
-endif()
-if(ENABLE_NCCL)
+
     find_package(NCCL REQUIRED)
     target_link_libraries(linalg NCCL)
 endif()

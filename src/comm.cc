@@ -2,44 +2,52 @@
 
 namespace Linalg {
 
-template <typename value_t> struct COMM_T {};
+template <typename value_t> MPI_Datatype MPI_T();
+template <> MPI_Datatype MPI_T<float>()  { return MPI_FLOAT; };
+template <> MPI_Datatype MPI_T<double>() { return MPI_DOUBLE; };
+
 #ifdef ENABLE_NCCL
-template <> struct COMM_T<float> { static constexpr ncclDataType_t type = ncclFloat; };
-template <> struct COMM_T<double> { static constexpr ncclDataType_t type = ncclDouble;  };
-#else
-template <> struct COMM_T<float> { static constexpr MPI_Datatype type = MPI_FLOAT; };
-template <> struct COMM_T<double> { static constexpr MPI_Datatype type = MPI_DOUBLE; };
+template <typename value_t> ncclDataType_t NCCL_T();
+template <> ncclDataType_t NCCL_T<float>()  { return ncclFloat; }
+template <> ncclDataType_t NCCL_T<double>() { return ncclDouble; }
 #endif
 
-// Template magic to compute types and sizes.
-template <typename T> struct CommValue {
-    using type = typename COMM_T< typename is_complex_t<T>::value_type >::type;
-    static constexpr int scale = is_complex_t<T>() ? 2 : 1;
-};
-
 // In-place sum-reduce a tile.
-// FIXME: make this part of the context (so cuda knows its stream)
 template <typename value_t>
-void Comm::reduce_sum(TileP<value_t> tile) {
-    using comm_val_t = CommValue<value_t>;
-    size_t count = tile->stride*tile->n * comm_val_t::scale;
+void Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src) {
+    blas_error_if_msg(dst->m != src->m || dst->n != src->n || dst->stride != src->stride,
+                      "Tile dimensions must match for allreduce.");
+    blas_error_if_msg(dst->loc != src->loc,
+                      "Cannot change places during allreduce.");
+    using T   = typename is_complex_t<value_t>::value_type;
+    int scale = is_complex_t<value_t>() ? 2 : 1;
+    size_t count = dst->stride*dst->n * scale;
 
-    switch(tile->loc) {
+    switch(dst->loc) {
     case Place::Host: {
-        CHECKMPI( MPI_Allreduce(MPI_IN_PLACE, (void *)tile->data,
-                      count, comm_val_t::type, MPI_SUM, mpi->comm)
-                );
+        if(dst->data == src->data) {
+            CHECKMPI( MPI_Allreduce(MPI_IN_PLACE, (void *)dst->data,
+                          count, MPI_T<T>(), MPI_SUM, mpi->comm)
+                    );
+        } else {
+            CHECKMPI( MPI_Allreduce((void *)src->data, (void *)dst->data,
+                          count, MPI_T<T>(), MPI_SUM, mpi->comm)
+                    );
+        }
     } break;
     case Place::CUDA: {
         CHECKNCCL(ncclAllReduce(
-                  tile->data, tile->data,
+                  src->data, dst->data,
                   count,
-                  comm_val_t::type, ncclSum,
-                  comm, stream));
+                  NCCL_T<T>(), ncclSum,
+                  comm, ctxt->get_queue().stream()));
     }
     default: assert(0);
     }
 }
+#define inst_allreduce_sum(value_t) template void \
+        Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src)
+instantiate_template(inst_allreduce_sum)
 
 }
 /*

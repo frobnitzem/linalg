@@ -121,6 +121,54 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
           const TileView<value_t> B, const value_t beta, TileView<value_t> C)
 instantiate_template(inst_gemmV)
 
+/* This handles copying between devices.
+ * It requires identical types and tile shapes.
+ * It allows unequal column-strides.
+ */
+template <typename value_t>
+void Context::copy(TileP<value_t> dst, TileP<value_t>src) {
+    blas_error_if_msg(dst.m != src.m || dst.n != src.n,
+                      "copy requires identical tile dimensions");
+    switch(dst.loc) {
+    case Place::Host: {
+        switch(src.loc) {
+        case Place::Host: {
+            #pragma omp parallel for collapse(2)
+            for(int64_t j=0; j<dst.n; j++) {
+                for(int64_t i=0; i<dst.m; i++) {
+                    dst.at(i,j) = src.at(i,j);
+                }
+            }
+        }
+        case Place::CUDA: {
+            blas::device_getmatrix(dst.m, dst.n, src.data, src.stride,
+                                   dst.data, dst.stride, get_queue());
+        }
+        default: assert(0);
+        }
+    } break;
+    case Place::CUDA: {
+        switch(src.loc) {
+        case Place::Host: {
+            blas::device_setmatrix(dst.m, dst.n, src.data, src.stride,
+                                   dst.data, dst.stride, get_queue());
+        }
+        case Place::CUDA: {
+            #ifndef ENABLE_CUDA
+            assert(0);
+            #else
+            copy_cuda<value_t, value_t>(TileView<value_t>(dst), TileView<value_t>(src));
+            #endif
+        }
+        default: assert(0);
+        }
+    } break;
+    default: assert(0);
+    }
+}
+
+/* This handles tile transposition and changing strides,
+ * but requires identical devices. */
 template <typename dst_t, typename src_t>
 void Context::copy(TileView<dst_t> dst, const TileView<src_t> src) {
     blas_error_if_msg(dst.mb() != src.mb() || dst.nb() != src.nb(),

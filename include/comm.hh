@@ -91,13 +91,15 @@ using CartGroupP = std::shared_ptr<CartGroup>;
 
 struct Comm {
     MPIp mpi;
+    ContextP ctxt;
 
-    #ifdef ENABLE_NCCL
+    #ifndef ENABLE_NCCL
+    Comm(MPIp _mpi, ContextP _ctxt) : mpi(_mpi), ctxt(_ctxt) {}
+    #else
     ncclUniqueId id;
     ncclComm_t comm;
 
-    Comm(MPIp _mpi) : mpi(_mpi) {
-        int numGPUs;
+    Comm(MPIp _mpi, ContextP _ctxt) : mpi(_mpi), ctxt(_ctxt) {
         if (mpi->rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
         CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi->comm) );
         CHECKNCCL( ncclCommInitRank(&comm, mpi->ranks, id, mpi->rank) );
@@ -105,8 +107,6 @@ struct Comm {
     ~Comm() {
         CHECKNCCL( ncclCommDestroy(comm) );
     }
-    #else
-    Comm(MPIp _mpi) : mpi(_mpi) {}
     #endif
 
     Comm (Comm &) = delete;
@@ -114,6 +114,6 @@ struct Comm {
 
     // In-place sum-reduce a tile.
     template <typename value_t>
-        void reduce_sum(TileP<value_t> tile);
+        void allreduce_sum(TileP<value_t> dst, const TileP<value_t> src);
 };
 using CommP = std::shared_ptr<Comm>;

@@ -63,11 +63,11 @@ class TileView {
         return op_ == blas::Op::NoTrans ? t->at(i,j) : t->at(j,i);
     }
     value_t const&  at(int64_t i, int64_t j) const {
-        assert(op_ != blas::Op::ConjTrans);
+        debug_assert(op_ != blas::Op::ConjTrans);
         return op_ == blas::Op::NoTrans ? t->at(i,j) : t->at(j,i);
     }
     value_t&        at(int64_t i, int64_t j)       {
-        assert(op_ != blas::Op::ConjTrans);
+        debug_assert(op_ != blas::Op::ConjTrans);
         return op_ == blas::Op::NoTrans ? t->at(i,j) : t->at(j,i);
     }
 

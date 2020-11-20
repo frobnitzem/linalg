@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include <iostream>
 #include <memory>
@@ -47,9 +46,9 @@ inline void BlockCyclic(const int64_t N,  // number of rows
 }
 
 #include "tile.hh"
+#include "context.hh"
 #include "comm.hh"
 #include "matrix.hh"
-#include "context.hh"
 
 } // namespace Linalg
 #undef INSIDE_LINALG_HH

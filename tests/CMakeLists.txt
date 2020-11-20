@@ -1,28 +1,25 @@
 enable_testing()
 
-add_executable(checklinalg checklinalg.cc)
-target_link_libraries(checklinalg PUBLIC linalg)
-add_test(NAME checklinalg COMMAND checklinalg)
+# define a function to simplify adding tests
+function(do_test target)
+  add_executable(${target} ${target}.cc)
+  target_link_libraries(${target} PUBLIC linalg)
+  add_test(NAME ${target} COMMAND ${target})
+endfunction(do_test)
 
-add_executable(checkblas checkblas.cc)
-target_link_libraries(checkblas PUBLIC linalg)
-add_test(NAME checkblas COMMAND checkblas)
+function(mat_test target)
+  add_executable(${target} ${target}.cc)
+  target_link_libraries(${target} PUBLIC linalg)
+  add_test(NAME ${target} COMMAND ${target} 200 500 100)
+endfunction(mat_test)
 
-add_executable(gemm gemm.cc)
-target_link_libraries(gemm PUBLIC linalg)
-add_test(NAME gemm COMMAND gemm 200 500 100)
-
-add_executable(gemmV gemmV.cc)
-target_link_libraries(gemmV PUBLIC linalg)
-add_test(NAME gemmV COMMAND gemmV 200 500 100)
-
-add_executable(copy copy.cc)
-target_link_libraries(copy PUBLIC linalg)
-add_test(NAME copy COMMAND copy)
+do_test(checklinalg)
+do_test(checkblas)
+mat_test(gemm)
+mat_test(gemmV)
+do_test(copy)
+do_test(allreduce)
 
 if(ENABLE_CUDA)
-  add_executable(checkblas_device checkblas_device.cc)
-  target_link_libraries(checkblas_device PUBLIC linalg)
-  add_test(NAME checkblas_device COMMAND checkblas_device)
-
+  do_test(checkblas_device)
 endif()

@@ -2,6 +2,7 @@
 
 LOCALROOT=$PWD/build/inst
 BLASPP=$(spack find --format '{prefix}' blaspp@2020.10.02 % gcc@8.4.0)
+NCCL=$(spack find --format '{prefix}' nccl % gcc@8.4.0)
 CUDA_COMPILER=$(spack find --format '{prefix}' cuda@11.1.0 % gcc@8.4.0)/bin/nvcc
 
 set -e
@@ -15,12 +16,10 @@ mkdir build
 cd build
 cmake -DCMAKE_CXX_COMPILER=g++-8 \
       -DCMAKE_CUDA_COMPILER=$CUDA_COMPILER \
-      -DCMAKE_PREFIX_PATH=$BLASPP \
+      -DCMAKE_PREFIX_PATH=$BLASPP\;$NCCL \
       -DCMAKE_INSTALL_PREFIX=$LOCALROOT \
-      -DENABLE_NCCL=OFF \
+      -DDISABLE_CUDA=ON \
       ..
-# -DDISABLE_CUDA=ON \
-# -DENABLE_NCCL=OFF \
 make -j4
 
 (cd tests && ctest)
