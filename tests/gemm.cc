@@ -3,35 +3,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory>
-#include <bits/stdc++.h>
+#include "testing.hh"
 
-#ifdef ENABLE_CUDA
-const Linalg::Place loc = Linalg::Place::CUDA;
-#else
-const Linalg::Place loc = Linalg::Place::Host;
-#endif
+const int ntests = 5;
 
-int main(int argc, char *argv[]) {
-    using T = float;
-    std::vector<double> results(5);
-    const int ntests = 5;
+template <typename T>
+int test(int64_t m, int64_t n, int64_t k, Linalg::Context &c, const Linalg::Place loc) {
+    std::vector<double> results(ntests);
 
-    if(argc != 4) {
-        printf("Usage: %s <m> <n> <k>\n", argv[0]);
-        return 1;
-    }
-    int m = atol(argv[1]);
-    int n = atol(argv[2]);
-    int k = atol(argv[3]);
-
-    Linalg::Context c;
-    //blas::Queue q;
     auto A = std::make_shared<Linalg::Tile<T> >(m, k, m, loc);
     auto B = std::make_shared<Linalg::Tile<T> >(k, n, k, loc);
     auto C = std::make_shared<Linalg::Tile<T> >(m, n, m, loc);
     c.set<T>(A, 1.0);
     c.set<T>(B, 0.5);
-    c.set<T>(C, 0.0);
+    c.set<T>(C, 0.1);
     c.sync();
 
     double gflop = blas::Gflop <T>::gemm( m, n, k );
@@ -43,18 +28,31 @@ int main(int argc, char *argv[]) {
         printf("GEMM time = %f sec.   gflops = %f\n", time, gflop / time);
         results[i] = time;
     }
-    //blas::device_getmatrix(m, n, dC, ldc, C.data(), ldc, queue);
-    //queue.sync();
+    print_times(results, gflop);
 
-    sort(results.begin(), results.end());
-    double sum = 0.0;
-    int N = 0;
-    // average of fastest times
-    for(int i=0; i < (ntests+1)/2; i++) {
-        sum += results[i];
-        N++;
-    }
-    printf("GFLOPS: %f\n", N*gflop/sum);
+    Linalg::TileP<T> Cx  = std::make_shared<Linalg::Tile<T> >(m, n, m, Linalg::Place::Host);
+    c.copy(Cx, C);
+    c.sync();
+    auto ans = std::make_shared<Linalg::Tile<T> >(m, n, roundup(m,32), Linalg::Place::Host);
+    c.set<T>(ans, 0.1 - k*ntests*0.5);
+    double err = nrm(Cx, ans);
+    //printf("ans = %f, expected = %f, err = %f\n", std::abs(Cx->at(0,0)), std::abs(ans->at(0,0)), err);
 
-    return 0;
+    return err > 1e-8;
+}
+
+int main(int argc, char *argv[]) {
+    Linalg::Context c;
+    setup(m,n,k)
+    int ret = 0;
+
+#define call_test(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::Host)
+    instantiate_template(call_test)
+
+#ifdef ENABLE_CUDA
+#define call_test2(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::CUDA)
+    instantiate_template(call_test2)
+#endif
+
+    return ret;
 }

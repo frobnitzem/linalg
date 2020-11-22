@@ -100,7 +100,7 @@ struct Comm {
     ncclComm_t comm;
 
     Comm(MPIp _mpi, ContextP _ctxt) : mpi(_mpi), ctxt(_ctxt) {
-        if (mpi->rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
+        if(mpi->rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
         CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi->comm) );
         CHECKNCCL( ncclCommInitRank(&comm, mpi->ranks, id, mpi->rank) );
     }

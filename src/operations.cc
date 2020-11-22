@@ -127,45 +127,48 @@ instantiate_template(inst_gemmV)
  */
 template <typename value_t>
 void Context::copy(TileP<value_t> dst, TileP<value_t>src) {
-    blas_error_if_msg(dst.m != src.m || dst.n != src.n,
+    blas_error_if_msg(dst->m != src->m || dst->n != src->n,
                       "copy requires identical tile dimensions");
-    switch(dst.loc) {
+    switch(dst->loc) {
     case Place::Host: {
-        switch(src.loc) {
+        switch(src->loc) {
         case Place::Host: {
             #pragma omp parallel for collapse(2)
-            for(int64_t j=0; j<dst.n; j++) {
-                for(int64_t i=0; i<dst.m; i++) {
-                    dst.at(i,j) = src.at(i,j);
+            for(int64_t j=0; j<dst->n; j++) {
+                for(int64_t i=0; i<dst->m; i++) {
+                    dst->at(i,j) = src->at(i,j);
                 }
             }
-        }
+        } break;
         case Place::CUDA: {
-            blas::device_getmatrix(dst.m, dst.n, src.data, src.stride,
-                                   dst.data, dst.stride, get_queue());
-        }
+            blas::device_getmatrix(dst->m, dst->n, src->data, src->stride,
+                                   dst->data, dst->stride, get_queue());
+        } break;
         default: assert(0);
         }
     } break;
     case Place::CUDA: {
-        switch(src.loc) {
+        switch(src->loc) {
         case Place::Host: {
-            blas::device_setmatrix(dst.m, dst.n, src.data, src.stride,
-                                   dst.data, dst.stride, get_queue());
-        }
+            blas::device_setmatrix(dst->m, dst->n, src->data, src->stride,
+                                   dst->data, dst->stride, get_queue());
+        } break;
         case Place::CUDA: {
             #ifndef ENABLE_CUDA
             assert(0);
             #else
             copy_cuda<value_t, value_t>(TileView<value_t>(dst), TileView<value_t>(src));
             #endif
-        }
+        } break;
         default: assert(0);
         }
     } break;
     default: assert(0);
     }
 }
+#define inst_copy(value_t) template void Context::copy<value_t>( \
+                            TileP<value_t> dst, TileP<value_t>src);
+instantiate_template(inst_copy)
 
 /* This handles tile transposition and changing strides,
  * but requires identical devices. */
@@ -214,8 +217,8 @@ void Context::copy(TileView<dst_t> dst, const TileView<src_t> src) {
 #define inst_copyV(dst_t) inst_copyV2(dst_t, float); \
                           inst_copyV2(dst_t, double)
 instantiate_template(inst_copyV)
-inst_copyV2(std::complex<float>, std::complex<float>);
-inst_copyV2(std::complex<float>, std::complex<double>);
+inst_copyV2(std::complex<float>,  std::complex<float>);
+inst_copyV2(std::complex<float>,  std::complex<double>);
 inst_copyV2(std::complex<double>, std::complex<float>);
 inst_copyV2(std::complex<double>, std::complex<double>);
 

@@ -41,7 +41,7 @@ void Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src) {
                   count,
                   NCCL_T<T>(), ncclSum,
                   comm, ctxt->get_queue().stream()));
-    }
+    } break;
     default: assert(0);
     }
 }

@@ -4,26 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory>
+#include "testing.hh"
 
-#ifdef ENABLE_CUDA
-const Linalg::Place loc = Linalg::Place::CUDA;
-#else
-const Linalg::Place loc = Linalg::Place::Host;
-#endif
+const int ntests = 5;
 
-int main(int argc, char *argv[]) {
-    using T = float;
+template <typename T>
+int test(int64_t m, int64_t n, int64_t k, Linalg::Context &c, const Linalg::Place loc) {
+    std::vector<double> results(ntests);
 
-    if(argc != 4) {
-        printf("Usage: %s <m> <n> <k>\n", argv[0]);
-        return 1;
-    }
-    int m = atol(argv[1]);
-    int n = atol(argv[2]);
-    int k = atol(argv[3]);
-
-    Linalg::Context c;
-    //blas::Queue q;
     auto At = std::make_shared<Linalg::Tile<T> >(m, k, m, loc);
     auto Bt = std::make_shared<Linalg::Tile<T> >(k, n, k, loc);
     auto Ct = std::make_shared<Linalg::Tile<T> >(m, n, m, loc);
@@ -35,17 +23,33 @@ int main(int argc, char *argv[]) {
     c.set<T>(C, 0.0);
     c.sync();
 
+    double gflop = blas::Gflop <T>::gemm( m, n, k );
     for(int i=0; i<5; i++) {
         double time = omp_get_wtime();
         c.gemm<T>(-1.0, A, B, 1.0, C);
         c.sync();
         time = omp_get_wtime() - time;
-        double gflop = blas::Gflop <T>::gemm( m, n, k );
         printf("GEMM time = %f sec.   gflops = %f\n", time, gflop / time);
+        results[i] = time;
     }
-    //blas::device_getmatrix(m, n, dC, ldc, C.data(), ldc, queue);
-    //c.sync();
+    print_times(results, gflop);
 
     return 0;
+}
+
+int main(int argc, char *argv[]) {
+    Linalg::Context c;
+    setup(m,n,k)
+    int ret = 0;
+
+#define call_test(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::Host)
+    instantiate_template(call_test)
+
+#ifdef ENABLE_CUDA
+#define call_test2(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::CUDA)
+    instantiate_template(call_test2)
+#endif
+
+    return ret;
 }
 
