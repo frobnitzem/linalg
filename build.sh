@@ -18,8 +18,8 @@ cmake -DCMAKE_CXX_COMPILER=g++-8 \
       -DCMAKE_CUDA_COMPILER=$CUDA_COMPILER \
       -DCMAKE_PREFIX_PATH=$BLASPP\;$NCCL \
       -DCMAKE_INSTALL_PREFIX=$LOCALROOT \
-      -DDISABLE_CUDA=ON \
       ..
+#     -DDISABLE_CUDA=ON \
 make -j4
 
 (cd tests && ctest)

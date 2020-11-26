@@ -14,39 +14,47 @@ class Matrix {
   public:
     using value_type = value_t;
 
+    const Place loc; // location for all home tiles
     const int64_t M, N;
-    const std::function<int64_t(int64_t)> inTileMb;
-    const std::function<int64_t(int64_t)> inTileNb;
-    std::shared_ptr<CartGroup> cart; // MPI communicator specialized for p,q
-    std::map<Idx,TileP<value_t> > tiles;
     int64_t mtile, ntile; // #tile row,columns
 
+    const std::function<int64_t(int64_t)> inTileMb;
+    const std::function<int64_t(int64_t)> inTileNb;
+    const std::function<int(Idx)> home; // (home rank)
+    std::vector<int64_t> rows, cols; // index to local rows and cols
+
+    CartCommP comm; // MPI communicator specialized for p,q
+    // TODO: demote to cache, try out indexed storage for speed
+    std::map<Idx,TileP<value_t> > tiles;
+    
     Matrix(const int64_t M, const int64_t N,
+           const int64_t col1, const Place loc,
            const std::function<int64_t(int64_t)> inTileMb,
            const std::function<int64_t(int64_t)> inTileNb,
-           std::shared_ptr<CartGroup> cart);
+           const std::function<int(Idx)> home,
+           CartCommP);
 
     // Allocate space and insert tiles.
-    TileP<value_t> alloc(Place);
+    TileP<value_t> alloc(int64_t align);
 
-    /*TileView<value_t> operator()(int64_t i, int64_t j) const {
+    TileView<value_t> operator()(int64_t i, int64_t j) {
         if(uplo_ != blas::Uplo::General && i == j)
-            return TileView<value_t>(tiles[idx(i,i)], op_, uplo_);
-        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles[idx(i,j)])
-                                   : TileView<value_t>(tiles[idx(j,i)], op_);
+            return TileView<value_t>(tiles.at(idx(i,i)), op_, uplo_);
+        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles.at(idx(i,j)))
+                                   : TileView<value_t>(tiles.at(idx(j,i)), op_);
     }
-    TileView<value_t> const&  at(int64_t i, int64_t j) const {
+    TileView<value_t> const at(int64_t i, int64_t j) const {
         if(uplo_ != blas::Uplo::General && i == j)
-            return TileView<value_t>(tiles[idx(i,i)], op_, uplo_);
-        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles[idx(i,j)])
-                                   : TileView<value_t>(tiles[idx(j,i)], op_);
+            return TileView<value_t>(tiles.at(idx(i,i)), op_, uplo_);
+        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles.at(idx(i,j)))
+                                   : TileView<value_t>(tiles.at(idx(j,i)), op_);
     }
     TileView<value_t> at(int64_t i, int64_t j) {
         if(uplo_ != blas::Uplo::General && i == j)
-            return TileView<value_t>(tiles[idx(i,i)], op_, uplo_);
-        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles[idx(i,j)])
-                                   : TileView<value_t>(tiles[idx(j,i)], op_);
-    }*/
+            return TileView<value_t>(tiles.at(idx(i,i)), op_, uplo_);
+        return op_ == blas::Op::NoTrans ? TileView<value_t>(tiles.at(idx(i,j)))
+                                   : TileView<value_t>(tiles.at(idx(j,i)), op_);
+    }
 
   protected:
     blas::Op op_;

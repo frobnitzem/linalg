@@ -17,9 +17,9 @@ struct Tile {
     const std::shared_ptr<Tile<value_t> > parent;
 
     // Root tile managing data pointer.
-    Tile(int64_t m, int64_t n, int64_t stride, Place);
+    Tile(int64_t m, int64_t n, int64_t align, Place);
     // Root tile holding external data pointer.
-    Tile(int64_t m, int64_t n, int64_t stride, value_t *data, Place);
+    Tile(int64_t m, int64_t n, int64_t align, value_t *data, Place);
     // m,n submatrix starting at index i,j of parent tile
     //     (points to external data)
     Tile(int64_t m, int64_t n,
@@ -32,6 +32,9 @@ struct Tile {
 };
 template <typename value_t>
 using TileP = std::shared_ptr<Tile<value_t> >;
+
+template <typename value_t>
+TileP<value_t> slice(TileP<value_t> A, int64_t i1, int64_t i2, int64_t j1, int64_t j2);
 
 /* The TileView encapsulates a tile with transposition and symmetry annotations */
 template <typename value_t>

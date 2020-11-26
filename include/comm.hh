@@ -14,26 +14,38 @@
 
 struct MPIH {
     int ranks, rank;
+    const bool global;
     MPI_Comm comm;
 
-    MPIH(int *argc, char **argv[]) : comm(MPI_COMM_WORLD) {
+    MPIH(int *argc, char **argv[]) : comm(MPI_COMM_WORLD), global(true) {
         int provided;
         CHECKMPI( MPI_Init_thread(argc, argv, MPI_THREAD_FUNNELED, &provided) );
         assert(provided >= MPI_THREAD_FUNNELED);
         CHECKMPI( MPI_Comm_size( comm, &ranks) );
         CHECKMPI( MPI_Comm_rank( comm, &rank ) );
     }
+
+    MPIH() : global(false), comm(nullptr) { }
+    MPIH (MPIH &mpi) : ranks(mpi.ranks), rank(mpi.rank), global(false) {
+        CHECKMPI( MPI_Comm_dup(mpi.comm, &comm) );
+    }
+    MPIH &operator=(MPIH &) = delete;
+
     ~MPIH() {
-        MPI_Finalize();
+        if(global) {
+            MPI_Finalize();
+        } else if(comm != nullptr) {
+            MPI_Comm_free(&comm);
+        }
     }
 };
 using MPIp = std::shared_ptr<MPIH>;
 
 // Create a Subgroup with 2D Cartesian Topology
-struct CartGroup {
+struct CartGroup : MPIH {
     const int p, q;
-    MPI_Comm comm; // == MPI_COMM_NULL for non-participating ranks
-    int rank;
+    //MPI_Comm comm; // == MPI_COMM_NULL for non-participating ranks
+    //int rank;
     union {
         struct {
             int i, j;
@@ -50,13 +62,14 @@ struct CartGroup {
         assert( !MPI_Comm_size(parent, &size) );
         assert( size >= p*q ); // Need to have enough ranks to make the decomposition.
 
-        std::vector<int> ranks(p*q);
-        for(int k=0; k<p*q; k++) {
-            ranks[k] = k;
+        ranks = p*q;
+        std::vector<int> ingrp(ranks);
+        for(int k=0; k<ranks; k++) {
+            ingrp[k] = k;
         }
 
         // Construct a group containing all of the ranks in parent_group
-        assert( !MPI_Group_incl(parent_group, p*q, &ranks[0], &group) );
+        assert( !MPI_Group_incl(parent_group, ranks, &ingrp[0], &group) );
 
         // Create a new communicator based on the group
         assert( !MPI_Comm_create_group(parent, group, 0, &subcomm) );
@@ -64,7 +77,7 @@ struct CartGroup {
         // Using MPI_COMM_NULL for MPI_Comm_rank or MPI_Comm_size is erroneous.
         if (subcomm != MPI_COMM_NULL) {
             assert( ! MPI_Comm_size(subcomm, &size) );
-            assert(size == p*q);
+            assert(size == ranks);
         }
 
         assert( ! MPI_Group_free(&parent_group) );
@@ -83,37 +96,51 @@ struct CartGroup {
         }
     }
 
-    ~CartGroup() {
-        MPI_Comm_free(&comm);
-    }
+    // default copy is OK
+    //CartGroup(CartGroup &cart) : MPIH(cart), p(cart.p), q(cart.q), coords(cart.coords) { }
+    CartGroup &operator=(CartGroup &) = delete;
 };
 using CartGroupP = std::shared_ptr<CartGroup>;
 
-struct Comm {
-    MPIp mpi;
+struct NCCLH {
     ContextP ctxt;
 
     #ifndef ENABLE_NCCL
-    Comm(MPIp _mpi, ContextP _ctxt) : mpi(_mpi), ctxt(_ctxt) {}
+    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {}
     #else
     ncclUniqueId id;
-    ncclComm_t comm;
+    ncclComm_t ncom;
 
-    Comm(MPIp _mpi, ContextP _ctxt) : mpi(_mpi), ctxt(_ctxt) {
-        if(mpi->rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
-        CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi->comm) );
-        CHECKNCCL( ncclCommInitRank(&comm, mpi->ranks, id, mpi->rank) );
+    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {
+        if(mpi.rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
+        CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi.comm) );
+        CHECKNCCL( ncclCommInitRank(&ncom, mpi.ranks, id, mpi.rank) );
     }
-    ~Comm() {
-        CHECKNCCL( ncclCommDestroy(comm) );
+    ~NCCLH() {
+        CHECKNCCL( ncclCommDestroy(ncom) );
     }
     #endif
 
-    Comm (Comm &) = delete;
-    Comm &operator=(Comm &) = delete;
+    NCCLH (NCCLH &) = delete;
+    NCCLH &operator=(NCCLH &) = delete;
+};
+
+struct Comm : MPIH, NCCLH {
+    Comm(MPIp mpi, ContextP ctxt) : MPIH(*mpi), NCCLH(*mpi, ctxt) {}
 
     // In-place sum-reduce a tile.
     template <typename value_t>
         void allreduce_sum(TileP<value_t> dst, const TileP<value_t> src);
 };
 using CommP = std::shared_ptr<Comm>;
+
+// trivial extension of Comm holding cart
+struct CartComm : Comm {
+    CartGroupP cart;
+
+    CartComm(CartGroupP _cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
+
+    CartComm (CartComm &) = delete;
+    CartComm &operator=(CartComm &) = delete;
+};
+using CartCommP = std::shared_ptr<CartComm>;

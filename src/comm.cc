@@ -27,11 +27,11 @@ void Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src) {
     case Place::Host: {
         if(dst->data == src->data) {
             CHECKMPI( MPI_Allreduce(MPI_IN_PLACE, (void *)dst->data,
-                          count, MPI_T<T>(), MPI_SUM, mpi->comm)
+                          count, MPI_T<T>(), MPI_SUM, comm)
                     );
         } else {
             CHECKMPI( MPI_Allreduce((void *)src->data, (void *)dst->data,
-                          count, MPI_T<T>(), MPI_SUM, mpi->comm)
+                          count, MPI_T<T>(), MPI_SUM, comm)
                     );
         }
     } break;
@@ -40,7 +40,7 @@ void Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src) {
                   src->data, dst->data,
                   count,
                   NCCL_T<T>(), ncclSum,
-                  comm, ctxt->get_queue().stream()));
+                  ncom, ctxt->get_queue().stream()));
     } break;
     default: assert(0);
     }
@@ -50,18 +50,3 @@ void Comm::allreduce_sum(TileP<value_t> dst, const TileP<value_t> src) {
 instantiate_template(inst_allreduce_sum)
 
 }
-/*
-int main(int argc, char *argv[]) {
-    auto mpi = std::make_shared<MPIH>(&argc, &argv);
-    auto nccl = std::make_shared<NCCLH>(mpi);
-
-    float *sendbuff, *recvbuff;
-    CHECKCUDA(cudaMalloc(&sendbuff, size * sizeof(float)));
-    CHECKCUDA(cudaMalloc(&recvbuff, size * sizeof(float)));
-
-    std::cout << "Hello" << std::endl;
-    run(nccl, sendbuff, recvbuff);
-    CHECKCUDA(cudaStreamSynchronize(nccl->stream));
-
-    return 0;
-}*/

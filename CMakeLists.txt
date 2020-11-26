@@ -39,6 +39,7 @@ set(LINALG_HEADERS
 set(LINALG_SOURCES
     src/context.cc
     src/comm.cc
+    src/tile.cc
     src/matrix.cc
     src/operations.cc)
 set(LINALG_CUDA_SOURCES

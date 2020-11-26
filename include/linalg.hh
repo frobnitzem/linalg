@@ -20,6 +20,8 @@
 #include "linalg_cuda.hh"
 #include "linalg_nccl.hh"
 
+#define roundup(x,y) ( ( ((x) + (y) - 1) / (int64_t)(y) ) * (int64_t)(y) )
+
 namespace Linalg {
 
 enum class Place {

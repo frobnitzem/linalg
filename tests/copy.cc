@@ -52,6 +52,15 @@ int main(int argc, char *argv[]) {
     bool tr1=false, tr2=false;
     int ret = 0;
 
+    if(argc == 5) {
+        m = atol(argv[1]);
+        n = atol(argv[2]);
+        stride1 = atol(argv[3]);
+        stride2 = atol(argv[4]);
+        assert(stride1 >= m);
+        assert(stride2 >= m);
+    }
+
     Linalg::Context c;
 
     printf("Host\n");
@@ -59,7 +68,7 @@ int main(int argc, char *argv[]) {
     instantiate_template(call_test)
 
 #ifdef ENABLE_CUDA
-    printf("Device\n");
+    printf("CUDA\n");
 #define call_test2(value_t) ret += test<value_t>(m,n,stride1,stride2,c,Linalg::Place::CUDA,tr1,tr2)
     instantiate_template(call_test2)
 #endif

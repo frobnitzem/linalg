@@ -39,6 +39,4 @@ double nrm(TileP<T> A, TileP<U> B) {
     return std::sqrt(ans);
 }
 
-#define roundup(x,y) ( ( ((x) + (y) - 1) / (int64_t)(y) ) * (int64_t)(y) )
-
 }
