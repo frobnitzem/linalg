@@ -3,7 +3,8 @@
 #endif
 // Note: this is inside namespace Linalg
 
-/*  Tiles can be either root tiles or submatrix views.
+/**
+ *  Tiles can be either root tiles or submatrix views.
  *  Root tiles can either 'own' their data pointer or
  *  have one imported.  The data pointer can never be null.
  */
@@ -16,18 +17,31 @@ struct Tile {
     const bool own_data; // true only for some root tiles
     const std::shared_ptr<Tile<value_t> > parent;
 
-    // Root tile managing data pointer.
+    /**
+     * Create a root tile managing data pointer.
+     */
     Tile(int64_t m, int64_t n, int64_t align, Place);
-    // Root tile holding external data pointer.
+
+    /**
+     * Create a root tile holding external data.
+     */
     Tile(int64_t m, int64_t n, int64_t align, value_t *data, Place);
-    // m,n submatrix starting at index i,j of parent tile
-    //     (points to external data)
+
+    /**
+     * Create a m,n submatrix view starting at index i,j of parent tile.
+     * From this tile's perspective, the data pointer is external.
+     */
     Tile(int64_t m, int64_t n,
          std::shared_ptr<Tile<value_t> > parent, int64_t i, int64_t j);
+
     ~Tile();
     value_t operator()(int64_t i, int64_t j) const { return data[j*stride+i]; }
     value_t const&  at(int64_t i, int64_t j) const { return data[j*stride+i]; }
     value_t&        at(int64_t i, int64_t j)       { return data[j*stride+i]; }
+
+    /**
+     * Print the tile's contents.  Nothing is printed for non-Host tiles.
+     */
     void print();
 };
 template <typename value_t>
@@ -36,7 +50,9 @@ using TileP = std::shared_ptr<Tile<value_t> >;
 template <typename value_t>
 TileP<value_t> slice(TileP<value_t> A, int64_t i1, int64_t i2, int64_t j1, int64_t j2);
 
-/* The TileView encapsulates a tile with transposition and symmetry annotations */
+/**
+ * The TileView encapsulates a tile with transposition and symmetry annotations.
+ */
 template <typename value_t>
 class TileView {
   public:
@@ -48,17 +64,19 @@ class TileView {
              blas::Uplo _uplo = blas::Uplo::General) :
         t(_t), op_(_op), uplo_(_uplo) {}
 
-    // rows
+    /// rows
     int64_t mb() const { return (op_ == blas::Op::NoTrans ? t->m : t->n); }
-    // cols
+
+    /// cols
     int64_t nb() const { return (op_ == blas::Op::NoTrans ? t->n : t->m); }
-    // lda
+
+    /// lda
     int64_t stride() const { return t->stride; }
 
     /// Returns const pointer to data, i.e., A(0,0), where A is this tile
     value_t const* data() const { return t->data; }
 
-    // Returns pointer to data, i.e., A(0,0), where A is this tile
+    // Returns pointer to data, i.e., &A.at(0,0), where A is this tile
     value_t*       data()       { return t->data; }
 
     value_t operator()(int64_t i, int64_t j) const {
@@ -74,7 +92,8 @@ class TileView {
         return op_ == blas::Op::NoTrans ? t->at(i,j) : t->at(j,i);
     }
 
-    void trans() { // transpose in-place
+    /// transpose the tile in-place
+    void trans() {
         switch(op_) {
         case blas::Op::NoTrans: op_ = blas::Op::Trans; break;
         case blas::Op::Trans: op_ = blas::Op::NoTrans; break;
@@ -82,7 +101,8 @@ class TileView {
             assert(0); // not supported
         }
     }
-    void conjTrans()      { // conj-transpose in-place
+    /// complex conjugate-transpose in-place
+    void conjTrans()      {
         switch(op_) {
         case blas::Op::NoTrans: op_ = blas::Op::ConjTrans; break;
         case blas::Op::ConjTrans: op_ = blas::Op::NoTrans; break;
@@ -91,8 +111,10 @@ class TileView {
         }
     }
 
-    blas::Op op() const     { return op_; }   // operator: NoTrans|Trans|ConjTrans
-    blas::Uplo uplo() const { return uplo_; } // storage: Upper|Lower|General
+    /// operator: NoTrans|Trans|ConjTrans
+    blas::Op op() const     { return op_; }
+    /// storage: Upper|Lower|General
+    blas::Uplo uplo() const { return uplo_; }
 
     /// Returns which host or GPU device tile's data is located on.
     Place device() const { return t->loc; }

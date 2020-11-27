@@ -65,16 +65,16 @@ if(ENABLE_CUDA)
                           CUDA_STANDARD_REQUIRED ON)
     set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 75)
     find_package(CUDAToolkit REQUIRED)
-    target_link_libraries(linalg CUDA::cudart CUDA::cublas)
+    target_link_libraries(linalg PRIVATE CUDA::cudart CUDA::cublas)
 
     target_sources(linalg PRIVATE ${LINALG_CUDA_SOURCES})
 
     find_package(NCCL REQUIRED)
-    target_link_libraries(linalg NCCL)
+    target_link_libraries(linalg PUBLIC NCCL)
 endif()
 
 # library code properties
-target_link_libraries(linalg linalg_compiler_flags blaspp MPI::MPI_CXX OpenMP::OpenMP_CXX)
+target_link_libraries(linalg PUBLIC linalg_compiler_flags blaspp MPI::MPI_CXX OpenMP::OpenMP_CXX)
 target_include_directories(linalg
                            PUBLIC
                             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -84,6 +84,8 @@ target_include_directories(linalg
 # lib needs PIC when BUILD_SHARED_LIBS=ON
 set_target_properties(linalg PROPERTIES
                       POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS}
+                      INSTALL_RPATH_USE_LINK_PATH YES
+                      BUILD_WITH_INSTALL_RPATH YES
                       )
 
 configure_file(include/linalg_config.hh.in include/linalg_config.hh)

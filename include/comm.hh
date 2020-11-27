@@ -12,12 +12,31 @@
     }                                             \
 } while(0)
 
+/**! Used internally for ref-counting by MPIH. */
+using MPIp = std::shared_ptr<MPI_Comm>;
+
+/**
+ * MPI wrapper to manage MPI_Init/Finalize (or Comm_free)
+ * and provide rank info quickly.  Pass by reference or value, either way.
+ * 
+ * The constructor from argc, argv should only be called once.
+ *
+ * Note that the default constructor for this object will create an
+ * uninitialized communicator, which you should set on your own.
+ * It will be freed for you by calling MPI_Comm_free.
+ *
+ * This class internally uses a shared pointer to count the number of copies.
+ * It works because the compiler-generated copy and assignment rules also
+ * copy the shared pointer.
+ * This avoids calling MPI_Comm_dup, and has the effect of keeping all
+ * communicators "live" until no more MPIH structs use it.
+ *
+ */
 struct MPIH {
     int ranks, rank;
-    const bool global;
     MPI_Comm comm;
 
-    MPIH(int *argc, char **argv[]) : comm(MPI_COMM_WORLD), global(true) {
+    MPIH(int *argc, char **argv[]) : comm(MPI_COMM_WORLD), pcomm(&comm, MPIH::free_mpi) {
         int provided;
         CHECKMPI( MPI_Init_thread(argc, argv, MPI_THREAD_FUNNELED, &provided) );
         assert(provided >= MPI_THREAD_FUNNELED);
@@ -25,27 +44,20 @@ struct MPIH {
         CHECKMPI( MPI_Comm_rank( comm, &rank ) );
     }
 
-    MPIH() : global(false), comm(nullptr) { }
-    MPIH (MPIH &mpi) : ranks(mpi.ranks), rank(mpi.rank), global(false) {
-        CHECKMPI( MPI_Comm_dup(mpi.comm, &comm) );
-    }
-    MPIH &operator=(MPIH &) = delete;
+    MPIH() : rank(-1), ranks(0), comm(nullptr), pcomm(&comm, MPIH::free_comm) { }
 
-    ~MPIH() {
-        if(global) {
-            MPI_Finalize();
-        } else if(comm != nullptr) {
-            MPI_Comm_free(&comm);
-        }
-    }
+    private:
+    MPIp pcomm;
+
+    static void free_mpi(MPI_Comm *p) { MPI_Finalize(); }
+    static void free_comm(MPI_Comm *p) { if(*p != nullptr) MPI_Comm_free(p); }
 };
-using MPIp = std::shared_ptr<MPIH>;
 
-// Create a Subgroup with 2D Cartesian Topology
+/**
+ * A Subgroup with 2D Cartesian Topology.
+ */
 struct CartGroup : MPIH {
     const int p, q;
-    //MPI_Comm comm; // == MPI_COMM_NULL for non-participating ranks
-    //int rank;
     union {
         struct {
             int i, j;
@@ -53,7 +65,10 @@ struct CartGroup : MPIH {
         int coords[2];
     };
 
-    CartGroup(MPI_Comm parent, int p_, int q_) : p(p_), q(q_) {
+    /**
+     * Create a new subgroup containing ranks start .. start+p*q-1
+     */
+    CartGroup(MPI_Comm parent, int p_, int q_, int start=0) : p(p_), q(q_) {
         MPI_Comm subcomm; // == MPI_COMM_NULL for non-participating ranks
         // Get the group of processes in parent
         MPI_Group group, parent_group;
@@ -65,7 +80,7 @@ struct CartGroup : MPIH {
         ranks = p*q;
         std::vector<int> ingrp(ranks);
         for(int k=0; k<ranks; k++) {
-            ingrp[k] = k;
+            ingrp[k] = (k+start) % size;
         }
 
         // Construct a group containing all of the ranks in parent_group
@@ -95,52 +110,53 @@ struct CartGroup : MPIH {
             comm = MPI_COMM_NULL;
         }
     }
-
-    // default copy is OK
-    //CartGroup(CartGroup &cart) : MPIH(cart), p(cart.p), q(cart.q), coords(cart.coords) { }
-    CartGroup &operator=(CartGroup &) = delete;
 };
-using CartGroupP = std::shared_ptr<CartGroup>;
 
+/**
+ * Helper class to store NCCL communicator.
+ * Like MPIH, it uses a shared ptr to manage the communicator.
+ */
 struct NCCLH {
     ContextP ctxt;
 
     #ifndef ENABLE_NCCL
     NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {}
     #else
-    ncclUniqueId id;
     ncclComm_t ncom;
 
-    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {
+    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt), pncom(&ncom, NCCLH::dtor) {
+        ncclUniqueId id;
         if(mpi.rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
         CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi.comm) );
         CHECKNCCL( ncclCommInitRank(&ncom, mpi.ranks, id, mpi.rank) );
     }
-    ~NCCLH() {
-        CHECKNCCL( ncclCommDestroy(ncom) );
-    }
     #endif
 
-    NCCLH (NCCLH &) = delete;
-    NCCLH &operator=(NCCLH &) = delete;
+    #ifdef ENABLE_NCCL
+    private:
+    std::shared_ptr<ncclComm_t> pncom;
+    static void dtor(ncclComm_t *p) {
+        CHECKNCCL( ncclCommDestroy(*p) );
+    }
+    #endif
 };
 
 struct Comm : MPIH, NCCLH {
-    Comm(MPIp mpi, ContextP ctxt) : MPIH(*mpi), NCCLH(*mpi, ctxt) {}
+    Comm(MPIH &mpi, ContextP ctxt) : MPIH(mpi), NCCLH(mpi, ctxt) {}
 
-    // In-place sum-reduce a tile.
+    /**
+     * Sum a tile over all ranks.  dst and src must be on the same
+     * device types and have the same layout.  In-place summation
+     * is done if dst and src point to the same data.
+     */
     template <typename value_t>
         void allreduce_sum(TileP<value_t> dst, const TileP<value_t> src);
 };
-using CommP = std::shared_ptr<Comm>;
 
-// trivial extension of Comm holding cart
+/**
+ * Trivial extension of Comm holding cart.
+ */
 struct CartComm : Comm {
-    CartGroupP cart;
-
-    CartComm(CartGroupP _cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
-
-    CartComm (CartComm &) = delete;
-    CartComm &operator=(CartComm &) = delete;
+    CartGroup cart; ///< Holds a copy of the communicator to avoid inheritance triangle problem.
+    CartComm(CartGroup &_cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
 };
-using CartCommP = std::shared_ptr<CartComm>;

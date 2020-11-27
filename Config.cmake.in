@@ -2,7 +2,13 @@
 
 include ( "${CMAKE_CURRENT_LIST_DIR}/LinalgTargets.cmake" )
 
-#include(CMakeFindDependencyMacro)
-#find_dependency(Linalg 1.0)
+include(CMakeFindDependencyMacro)
+find_dependency(OpenMP   3.1)
+find_dependency(MPI      1.0)
+find_dependency(blaspp 2020.10.02)
+if(@ENABLE_CUDA@)
+  find_dependency(CUDAToolkit)
+  find_dependency(NCCL)
+endif()
 
 check_required_components(Linalg)

@@ -24,11 +24,16 @@
 
 namespace Linalg {
 
+/**  The place where a block of memory is stored.
+ *   This is used internally in switch() statements
+ *   to choose implementation code for tile operations
+ *   at run-time.
+ */
 enum class Place {
     Host, PHI, CUDA, HIP
 };
 
-// This is the scalapack method, local = lda
+/// Helper function for determining layouts in the scalapack method, local = lda
 inline void BlockCyclic(const int64_t N,  // number of rows
                         const int64_t nb, // row blocksize
                         const int np, // number of processors per row

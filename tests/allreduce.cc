@@ -25,7 +25,7 @@ int test(int64_t m, int64_t n, int64_t stride, Linalg::Comm &c, const Linalg::Pl
     if(c.rank == 0)
         print_times(results, sizeof(T)*stride*n / (1024.*1024));
 
-    auto B = std::make_shared<Linalg::Tile<T> >(m, n, stride, loc);
+    auto B = std::make_shared<Linalg::Tile<T> >(m, n, stride, Linalg::Place::Host);
     c.ctxt->set<T>(B, std::pow(c.ranks, ntest));
     Linalg::TileP<T> Ax = A;
     if(loc == Linalg::Place::CUDA) {
@@ -52,19 +52,19 @@ int main(int argc, char *argv[]) {
         assert(stride >= m);
     }
 
-    auto mpi  = std::make_shared<Linalg::MPIH>(&argc, &argv);
+    auto mpi  = Linalg::MPIH(&argc, &argv);
     auto ctxt = std::make_shared<Linalg::Context>();
     Linalg::Comm c(mpi, ctxt);
 
     int ret = 0;
 
-    if(mpi->rank == 0)
+    if(mpi.rank == 0)
         printf("Host\n");
 #define call_test(value_t) ret += test<value_t>(m,n,stride,c,Linalg::Place::Host)
     instantiate_template(call_test)
 
     #ifdef ENABLE_CUDA
-    if(mpi->rank == 0)
+    if(mpi.rank == 0)
         printf("CUDA\n");
 #define call_test2(value_t) ret += test<value_t>(m,n,stride,c,Linalg::Place::CUDA)
     instantiate_template(call_test2)

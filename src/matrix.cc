@@ -10,10 +10,10 @@ Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
            const std::function<int64_t(int64_t)> inTileMb_,
            const std::function<int64_t(int64_t)> inTileNb_,
            const std::function<int(Idx)> home_,
-           CartCommP comm_) : loc(loc_), M(M_), N(N_),
+           CartComm &mpi_) : loc(loc_), M(M_), N(N_),
                 inTileMb(inTileMb_), inTileNb(inTileNb_),
-                home(home_), comm(comm_) {
-    int rank = comm->rank;
+                home(home_), mpi(mpi_) {
+    int rank = mpi.rank;
     int64_t i=0, j=0, m=0, n=0;
     for(i=0; m<M; i++) {
         int64_t tm = inTileMb(i);
@@ -47,17 +47,15 @@ Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
 template <typename value_t>
 TileP<value_t> Matrix<value_t>::alloc(int64_t align) {
     int64_t mloc=0, nloc=0;
-    //#pragma omp parallel for reduction(+: mloc)
     for(auto i : rows) mloc += inTileMb(i);
-    //#pragma omp parallel for reduction(+: nloc)
     for(auto j : cols) nloc += inTileNb(j);
 
     TileP<value_t> root = std::make_shared<Tile<value_t> >(mloc, nloc, align, loc);
 
-    int64_t n=0;
+    int64_t n=0; // running column offset of sub-tile upper-left corner
     for(auto j : cols) {
         int64_t tn = inTileNb(j);
-        int64_t m = 0;
+        int64_t m = 0; // running row offset of sub-tile upper-left corner
         for(auto i : rows) {
             int64_t tm = inTileMb(i);
             TileP<value_t> x = std::make_shared<Tile<value_t> >(tm, tn, root, m, n);
