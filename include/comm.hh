@@ -50,11 +50,16 @@ struct MPIH {
     MPIp pcomm;
 
     static void free_mpi(MPI_Comm *p) { MPI_Finalize(); }
-    static void free_comm(MPI_Comm *p) { if(*p != nullptr) MPI_Comm_free(p); }
+    static void free_comm(MPI_Comm *p) { if(*p != nullptr && *p != MPI_COMM_NULL) MPI_Comm_free(p); }
 };
 
 /**
  * A Subgroup with 2D Cartesian Topology.
+ *
+ * i,j (and p,q) are row and column indices (and sizes).
+ *
+ * Note: We reversed MPI's convention so that
+ *       ranks are in column-major order [ rank = j*p+i ]
  */
 struct CartGroup : MPIH {
     const int p, q;
@@ -65,6 +70,10 @@ struct CartGroup : MPIH {
         int coords[2];
     };
 
+    ///* Is this rank active?
+    bool active() {
+        return comm != MPI_COMM_NULL;
+    }
     /**
      * Create a new subgroup containing ranks start .. start+p*q-1
      */
@@ -98,12 +107,16 @@ struct CartGroup : MPIH {
         assert( ! MPI_Group_free(&parent_group) );
         assert( ! MPI_Group_free(&group) );
 
-        if (subcomm != MPI_COMM_NULL) {
-            int dims[2] = {p, q};
+        if (subcomm != MPI_COMM_NULL) { // MPI_Cart gives row-major ordering, so
+            int dims[2] = {q, p}; // this section is reversed to get column-major ordering.
             int periods[2] = {0, 0};
+            int tcrd[2];
             assert( ! MPI_Cart_create(subcomm, 2, dims, periods, 1, &comm) );
             assert( ! MPI_Comm_rank(  comm, &rank) );
-            assert( ! MPI_Cart_coords(comm, rank, 2, coords) );
+            assert( ! MPI_Cart_coords(comm, rank, 2, tcrd) );
+            coords[0] = tcrd[1];
+            coords[1] = tcrd[0];
+            assert( coords[0]+coords[1]*p == rank ); // column-major
 
             MPI_Comm_free(&subcomm);
         } else {
@@ -120,11 +133,11 @@ struct NCCLH {
     ContextP ctxt;
 
     #ifndef ENABLE_NCCL
-    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {}
+    NCCLH(const MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt) {}
     #else
     ncclComm_t ncom;
 
-    NCCLH(MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt), pncom(&ncom, NCCLH::dtor) {
+    NCCLH(const MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt), pncom(&ncom, NCCLH::dtor) {
         ncclUniqueId id;
         if(mpi.rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
         CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi.comm) );
@@ -142,7 +155,8 @@ struct NCCLH {
 };
 
 struct Comm : MPIH, NCCLH {
-    Comm(MPIH &mpi, ContextP ctxt) : MPIH(mpi), NCCLH(mpi, ctxt) {}
+    Comm(const MPIH &mpi, ContextP ctxt) : MPIH(mpi), NCCLH(mpi, ctxt) {}
+    Comm(MPIH &&mpi, ContextP ctxt) : MPIH(mpi), NCCLH(mpi, ctxt) {}
 
     /**
      * Sum a tile over all ranks.  dst and src must be on the same
@@ -158,5 +172,6 @@ struct Comm : MPIH, NCCLH {
  */
 struct CartComm : Comm {
     CartGroup cart; ///< Holds a copy of the communicator to avoid inheritance triangle problem.
-    CartComm(CartGroup &_cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
+    CartComm(const CartGroup &_cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
+    CartComm(CartGroup &&_cart, ContextP ctxt) : Comm(_cart, ctxt), cart(_cart) {}
 };

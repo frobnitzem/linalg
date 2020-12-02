@@ -73,6 +73,9 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
                    const TileView<value_t> B, const value_t beta,
                    TileView<value_t> C) {
 
+    assert(A.mb() == C.mb());
+    assert(A.nb() == B.mb());
+    assert(B.nb() == C.nb());
     blas_error_if_msg(A.mb() != C.mb() || A.nb() != B.mb() || B.nb() != C.nb(),
                             "Invalid dimensions for gemm");
     blas_error_if_msg(C.device() != B.device() || C.device() != A.device(),
@@ -80,6 +83,8 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
 
     TileView<value_t> Ap(A);
     TileView<value_t> Bp(B);
+    value_t a = alpha;
+    value_t b = beta;
     switch(C.op()) {
     case blas::Op::NoTrans: break;
     case blas::Op::Trans: {
@@ -91,16 +96,19 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
         Ap.conjTrans();
         Bp.conjTrans();
         std::swap(Ap, Bp);
+        a = is_complex_t<value_t>::conj(a);
+        b = is_complex_t<value_t>::conj(b);
     } break;
+    default: assert(0);
     }
 
     switch(C.device()) {
     case Place::Host: {
         blas::gemm( blas::Layout::ColMajor, Ap.op(), Bp.op(),
                     Ap.mb(), Bp.nb(), Ap.nb(),
-                    alpha, Ap.data(), Ap.stride(),
+                        a, Ap.data(), Ap.stride(),
                            Bp.data(), Bp.stride(),
-                     beta, C.data(), C.stride() );
+                        b, C.data(),  C.stride() );
 
     } break;
     case Place::CUDA: {
@@ -109,9 +117,9 @@ void Context::gemm(const value_t alpha, const TileView<value_t> A,
         #endif
         blas::gemm( blas::Layout::ColMajor, Ap.op(), Bp.op(),
                     Ap.mb(), Bp.nb(), Ap.nb(),
-                    alpha, Ap.data(), Ap.stride(),
+                        a, Ap.data(), Ap.stride(),
                            Bp.data(), Bp.stride(),
-                     beta, C.data(), C.stride(), get_queue() );
+                        b, C.data(),  C.stride(), get_queue() );
     } break;
     default: assert(0);
     }

@@ -3,7 +3,6 @@
 
 namespace Linalg {
 
-/* TODO: split out tile routines to tile.cc */
 template <typename value_t>
 Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
            const int64_t col1, const Place loc_,
@@ -12,7 +11,8 @@ Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
            const std::function<int(Idx)> home_,
            CartComm &mpi_) : loc(loc_), M(M_), N(N_),
                 inTileMb(inTileMb_), inTileNb(inTileNb_),
-                home(home_), mpi(mpi_) {
+                home(home_), mpi(mpi_),
+                op_(blas::Op::NoTrans), uplo_(blas::Uplo::General) {
     int rank = mpi.rank;
     int64_t i=0, j=0, m=0, n=0;
     for(i=0; m<M; i++) {

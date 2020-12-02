@@ -8,6 +8,10 @@ template <typename value_t>
 Tile<value_t>::Tile(int64_t m_, int64_t n_, int64_t align_, Place loc_)
        : loc(loc_), m(m_), n(n_), stride(roundup(m_, align_)), own_data(true) {
     const size_t sz = stride*n*sizeof(value_t);
+    if(sz == 0) {
+        data = nullptr;
+        return;
+    }
     switch(loc) {
     case Place::Host: {
         #ifdef ENABLE_CUDA
@@ -45,13 +49,16 @@ TileP<value_t> slice(TileP<value_t> A, int64_t i1, int64_t i2, int64_t j1, int64
     assert(0 <= i1 && i2 <= A->m);
     assert(0 <= j1 && j2 <= A->n);
     assert(i1 <= i2 && j1 <= j2);
-    return std::make_shared<Tile<value_t>>(i2-i1, j2-j1, A, i1, i2);
+    return std::make_shared<Tile<value_t>>(i2-i1, j2-j1, A, i1, j1);
 }
+#define inst_slice(value_t) template TileP<value_t> slice<value_t>(\
+            TileP<value_t> A, int64_t i1, int64_t i2, int64_t j1, int64_t j2);
+instantiate_template(inst_slice)
 
 template <typename value_t>
 Tile<value_t>::~Tile() {
-        //printf("Called dtor for Tile %ld %ld %ld (%d)\n", m, n, stride, own_data);
-    if(!own_data) {
+    //printf("Called dtor for Tile %ld %ld %ld (%d)\n", m, n, stride, own_data);
+    if(!own_data || data == nullptr) {
         return;
     }
 
