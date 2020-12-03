@@ -19,6 +19,7 @@ mat_test(gemm)
 mat_test(gemmV)
 do_test(copy)
 do_test(allreduce)
+do_test(matrix)
 
 if(ENABLE_CUDA)
   do_test(checkblas_device)

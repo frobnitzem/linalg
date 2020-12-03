@@ -41,9 +41,6 @@ Matrix<value_t>::Matrix(const int64_t M_, const int64_t N_,
     ntile = j;
 }
 
-// Allocate space and insert tiles for local segment of
-// this matrix in a scalapack-distributed format over a p,q proc. grid.
-// Returns the root tile.
 template <typename value_t>
 TileP<value_t> Matrix<value_t>::alloc(int64_t align) {
     int64_t mloc=0, nloc=0;
