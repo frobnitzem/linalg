@@ -6,6 +6,23 @@ using namespace Linalg;
 static const int verbose = 0;
 static const int progress = 0;
 
+struct Timed {
+    Timed(const std::string _name, const double _gflop, const Comm &_mpi) :
+        name(_name), gflop(_gflop),
+        mpi(_mpi), start(omp_get_wtime()) {}
+    ~Timed() {
+        if(mpi.rank != 0) return;
+        mpi.ctxt->sync();
+        const double time = omp_get_wtime() - start;
+        printf("%s = %f sec., GFLOPS = %f\n", name.c_str(), time, gflop / time);
+    }
+
+    const std::string name;
+    const double gflop;
+    const Comm &mpi;
+    const double start;
+};
+
 /**
  * Return a tall, skinny matrix laid
  * out contiguously across processors:
@@ -57,37 +74,6 @@ Matrix<T> newMatrix(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &c,
     return Matrix<T>(m, n, c.cart.j, loc, inTileMb, inTileNb, home, c);
 }
 
-template <typename T>
-int check_matrix_distn(Matrix<T> &M) {
-    if(!M.mpi.cart.active()) return 0;
-
-    int64_t err1=0, err2=0;
-    TileView<T> T0 = M(M.rows[0], M.cols[0]);
-    int64_t mb = T0.mb(); // blk-size from first tile
-    int64_t nb = T0.nb();
-    int64_t stride = T0.t->stride; // entire tile stride
-    T *first = T0.data();
-
-    for(int64_t tj : M.cols) {
-        for(int64_t ti : M.rows) {
-            if(M.home(Idx(ti,tj)) != M.mpi.rank) {
-                err1 += 1;
-                continue;
-            }
-            T *tile = M(ti,tj).data();
-            int64_t i = ( (tile-first)%stride ) / mb;
-            int64_t j = ( (tile-first)/stride ) / nb;
-            err2 += (M.rows[i] != ti) || (M.cols[j] != tj);
-        }
-    }
-    if(err1 > 0)
-        printf("Rank %d: missing %ld home tiles\n", M.mpi.rank, err1);
-    if(err2 > 0)
-        printf("Rank %d: improper location for %ld tiles\n", M.mpi.rank, err2);
-
-    return err1 > 0 || err2 > 0;
-}
-
 /**
  * Compute a p*bs x p*bs subtile of the output matrix
  * (located at ti,tj for every processor).
@@ -101,6 +87,7 @@ template <typename value_t>
 void compute_tile(Matrix<value_t> &X, TileP<value_t> out, int64_t ti, int64_t tj) {
     Linalg::ContextP ctxt = X.mpi.ctxt;
 
+    Timed timer("Compute Tile", 2.0*X.M*X.inTileNb(ti)*X.inTileNb(tj)/(1024.*1024*1024), X.mpi);
     ctxt->set< value_t >(out, 0.0);
     for(auto tk : X.rows) {
         auto A = X(tk,ti);
@@ -129,6 +116,8 @@ void set_local(Matrix<T> &S, TileP<T> out, int64_t ti, int64_t tj) {
     int64_t j = tj*S.mpi.cart.q + S.mpi.cart.j;
     if(i >= S.mtile || j >= S.ntile) return; // last row/col
 
+    Timed timer("Copy Tile", S.inTileMb(i)*S.inTileNb(j)/(1024.*1024*1024), S.mpi);
+
     int64_t start_m = S.inTileMb(0)*S.mpi.cart.i; // assume const block size
     int64_t start_n = S.inTileNb(0)*S.mpi.cart.j;
     int64_t end_m = start_m + S.inTileMb(i);
@@ -156,8 +145,6 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
     auto A = X.alloc(mbs);
     auto S = newMatrix<T>(n, n, nbs, nbs, cS, loc);
     auto B = S.alloc(nbs);
-    if( check_matrix_distn<T>(X) ) return 1;
-    if( check_matrix_distn<T>(S) ) return 1;
 
     auto out = std::make_shared<Tile<T> >(nbs*S.mpi.cart.p, nbs*S.mpi.cart.q, 1, loc);
     if(progress)
@@ -183,7 +170,10 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
                 compute_tile(X, out, ti, tj);
                 if(progress)
                     printf("Rank %d: reduce tile %ld %ld (%d)\n", X.mpi.rank, ti, tj, out->data == out->data);
+                {
+                Timed timer("Allreduce Tile", out->m*out->n/(1024.*1024*1024), X.mpi);
                 X.mpi.allreduce_sum(out, out);
+                }
                 if(progress)
                     printf("Rank %d: copy tile %ld %ld\n", X.mpi.rank, ti, tj);
                 set_local(S, out, ti, tj);
@@ -196,26 +186,11 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
         time = omp_get_wtime() - time;
         results[i] = time;
         if(cX.rank == 0)
-            printf("S-time = %f sec., GFLOPS = %f\n", time, (n/1024.)*(n/1024.)*(m/1024.));
+            printf("S-time = %f sec., GFLOPS = %f\n", time, 2*(n/1024.)*(n/1024.)*(m/1024.) / time);
     }
     /*if(c.rank == 0)
         print_times(results, sizeof(T)*m*n / (1024.*1024));
     */
-
-    if(! S.mpi.cart.active()) return 0;
-
-    auto C = std::make_shared<Tile<T> >(B->m, B->n, B->stride, Place::Host);
-    cX.ctxt->set<T>(C, m);
-    TileP<T> Bx = B;
-    if(loc == Place::CUDA) {
-        Bx = std::make_shared<Tile<T> >(B->m, B->n, B->stride, Place::Host);
-        cX.ctxt->copy(Bx, B);
-    }
-    //if(c.rank == 0)
-    //    printf("ans = %f, expected %f\n", std::abs(Ax->at(0,0)), std::abs(B->at(0,0)));
-    cX.ctxt->sync();
-    //double err = nrm(Bx, C);
-    //return err > 1e-8;
     return 0;
 }
 
