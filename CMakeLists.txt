@@ -20,6 +20,7 @@ target_compile_features(linalg_compiler_flags INTERFACE cxx_std_14)
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 option(DISABLE_CUDA      "Don't use cuda backend, regardless of blaspp support." OFF)
 option(BUILD_TESTS       "Build the tests accompanying this library." ON)
+option(CUDA_ARCH         "Cuda Architecture e.g. 52 or 70" 52)
 
 #####################################################################
 # ATTENTION: add all your library's static exported header files to this list
@@ -63,7 +64,7 @@ if(ENABLE_CUDA)
     set_target_properties(linalg PROPERTIES
                           CUDA_STANDARD 14
                           CUDA_STANDARD_REQUIRED ON)
-    set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES 75)
+    set_property(TARGET linalg PROPERTY CUDA_ARCHITECTURES ${CUDA_ARCH})
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(linalg PRIVATE CUDA::cudart CUDA::cublas)
 

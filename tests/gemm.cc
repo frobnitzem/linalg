@@ -14,6 +14,7 @@ int test(int64_t m, int64_t n, int64_t k, Linalg::Context &c, const Linalg::Plac
     auto A = std::make_shared<Linalg::Tile<T> >(m, k, m, loc);
     auto B = std::make_shared<Linalg::Tile<T> >(k, n, k, loc);
     auto C = std::make_shared<Linalg::Tile<T> >(m, n, m, loc);
+
     c.set<T>(A, 1.0);
     c.set<T>(B, 0.5);
     c.set<T>(C, 0.1);
@@ -30,15 +31,25 @@ int test(int64_t m, int64_t n, int64_t k, Linalg::Context &c, const Linalg::Plac
     }
     print_times(results, gflop);
 
-    Linalg::TileP<T> Cx  = std::make_shared<Linalg::Tile<T> >(m, n, m, Linalg::Place::Host);
-    c.copy(Cx, C);
-    c.sync();
-    auto ans = std::make_shared<Linalg::Tile<T> >(m, n, roundup(m,32), Linalg::Place::Host);
-    c.set<T>(ans, 0.1 - k*ntests*0.5);
-    double err = nrm(Cx, ans);
-    //printf("ans = %f, expected = %f, err = %f\n", std::abs(Cx->at(0,0)), std::abs(ans->at(0,0)), err);
+    double ans0 = 0.1 - k*ntests*0.5;
 
-    return err > 1e-8;
+    auto ans = std::make_shared<Linalg::Tile<T> >(m, n, roundup(m,32), Linalg::Place::Host);
+    c.set<T>(ans, ans0);
+
+    Linalg::TileP<T> Cx = C;
+    if(C->loc != Linalg::Place::Host) {
+        Cx  = std::make_shared<Linalg::Tile<T> >(m, n, m, Linalg::Place::Host);
+        c.copy(Cx, C);
+    }
+    c.sync();
+
+    double err = nrm(Cx, ans);
+    bool ret = err > std::abs( ans0*max_epsilon<T>() );
+    if(ret)
+        printf("ans = %f, expected = %f, err = %e, max = %e\n",
+                std::abs(Cx->at(0,0)), std::abs(ans->at(0,0)), err, std::abs( ans0*max_epsilon<T>()));
+
+    return ret;
 }
 
 int main(int argc, char *argv[]) {
@@ -47,9 +58,13 @@ int main(int argc, char *argv[]) {
     int ret = 0;
 
 #define call_test(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::Host)
-    instantiate_template(call_test)
+    if(m < 1024 || n < 1024 || k < 1024) {
+        printf("Host\n");
+        instantiate_template(call_test)
+    }
 
 #ifdef ENABLE_CUDA
+    printf("CUDA\n");
 #define call_test2(value_t) ret += test<value_t>(m,n,k,c,Linalg::Place::CUDA)
     instantiate_template(call_test2)
 #endif

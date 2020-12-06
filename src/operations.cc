@@ -44,6 +44,7 @@ instantiate_template(inst_gemm)
 
 template <typename value_t>
 void Context::set(TileP<value_t> t, const value_t a) {
+    if(t->m == 0 || t->n == 0) return;
     switch(t->loc) {
     case Place::Host: {
         #pragma omp parallel for collapse(2)

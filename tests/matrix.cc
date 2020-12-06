@@ -197,7 +197,7 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
         time = omp_get_wtime() - time;
         results[i] = time;
         if(cX.rank == 0)
-            printf("S-time = %f sec., GFLOPS = %f\n", time, (n/1024.)*(n/1024.)*(m/1024.));
+            printf("S-time = %f sec., GFLOPS = %f\n", time, (n/1024.)*(n/1024.)*(m/1024.)/time);
     }
     if(cX.rank == 0)
         print_times(results, 2*(n/1024.)*(n/1024.)*(m/1024.));
@@ -218,8 +218,9 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
         err += nrm( slice(Bx, off, Bx->m, off, off+S.inTileNb(j)),
                     slice(C,  off, C->m,  off, off+S.inTileNb(j)) );
     }
-    printf("ans = %f, expected = %f, err = %f\n", std::abs(Bx->at(0,0)), std::abs(C->at(0,0)), err);
-    return err > 1e-8;
+    if(err > max_epsilon<T>())
+        printf("ans = %f, expected = %f, err = %e\n", std::abs(Bx->at(0,0)), std::abs(C->at(0,0)), err);
+    return err > max_epsilon<T>();
 }
 
 // find min(floor(sqrt(ranks)), max)

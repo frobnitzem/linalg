@@ -2,7 +2,7 @@
 
 template <typename T>
 static __global__ void set_kernel(size_t n, T a, T *x) {
-    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x;
          i < n;
          i += blockDim.x * gridDim.x) {
           x[i] = a;
@@ -13,14 +13,14 @@ template <typename T, typename U>
 static __device__ T make(const U x) {
     return (T)x;
 }
-template<> __device__ cuComplex make(const cuComplex x) { return x; }
-template<> __device__ cuDoubleComplex make(const cuDoubleComplex x) { return x; }
-template<> __device__ cuComplex make(const cuDoubleComplex x) { return {(float)x.x, (float)x.y}; }
-template<> __device__ cuDoubleComplex make(const cuComplex x) { return {x.x,x.y}; }
-template<> __device__ cuComplex make(const float x) { return cuComplex{x,0.0}; }
-template<> __device__ cuDoubleComplex make(const float x) { return cuDoubleComplex{x,0.0}; }
-template<> __device__ cuComplex make(const double x) { return cuComplex{(float)x,0.0}; }
-template<> __device__ cuDoubleComplex make(const double x) { return cuDoubleComplex{x,0.0}; }
+template<> __device__ __host__ cuComplex make(const cuComplex x) { return x; }
+template<> __device__ __host__ cuDoubleComplex make(const cuDoubleComplex x) { return x; }
+template<> __device__ __host__ cuComplex make(const cuDoubleComplex x) { return {(float)x.x, (float)x.y}; }
+template<> __device__ __host__ cuDoubleComplex make(const cuComplex x) { return {x.x,x.y}; }
+template<> __device__ __host__ cuComplex make(const float x) { return cuComplex{x,0.0}; }
+template<> __device__ __host__ cuDoubleComplex make(const float x) { return cuDoubleComplex{x,0.0}; }
+template<> __device__ __host__ cuComplex make(const double x) { return cuComplex{(float)x,0.0}; }
+template<> __device__ __host__ cuDoubleComplex make(const double x) { return cuDoubleComplex{x,0.0}; }
 
 // copy. A and B are mxn.
 template <typename T, typename U>
@@ -57,27 +57,10 @@ static int num_blks(size_t N, int blk) {
     //numSMs *= 32;
     int numSMs = 160*32;
     size_t maxblk = (N+blk-1) / blk; // maximum block size
-    if(maxblk < numSMs) numSMs = maxblk;
-    return numSMs;
+    return maxblk < numSMs ? maxblk : numSMs;
 }
 
 namespace Linalg {
-template <typename T>
-void Context::set_cuda(TileP<T> t, const T a) {
-    if(a == (T)0.0) {
-        CHECKCUDA( cudaMemset(t->data, 0, t->stride*t->n*sizeof(T)) );
-        return;
-    }
-
-    size_t N = (size_t)t->stride * t->n;
-    int blks = num_blks(N, 32);
-
-    cudaStream_t stream = get_queue().stream();
-    set_kernel<<<blks, 32, 0, stream >>>(N, a, t->data);
-}
-#define inst_set_cuda(T) template void Context::set_cuda(TileP<T> t, const T a)
-instantiate_template(inst_set_cuda)
-
 /* Casting rules for cuda datatypes */
 template <typename value_t> struct CUDA_T {};
 template <> struct CUDA_T<float>  {
@@ -100,6 +83,23 @@ template <> struct CUDA_T<std::complex<double>>  {
     static       cuDoubleComplex *cast(      std::complex<double> *x)
         { return (cuDoubleComplex *)reinterpret_cast<      double *>(x); }
 };
+
+template <typename T>
+void Context::set_cuda(TileP<T> t, const T a) {
+    cudaStream_t stream = get_queue().stream();
+    if(a == (T)0.0) {
+        CHECKCUDA( cudaMemsetAsync(t->data, 0, t->stride*t->n*sizeof(T), stream) );
+        return;
+    }
+
+    size_t N = (size_t)t->stride * t->n;
+    int blks = num_blks(N, 32);
+
+    set_kernel<<<blks, 32, 0, stream>>>(N, *CUDA_T<T>::cast(&a), CUDA_T<T>::cast(t->data));
+    CHECKCUDA( cudaPeekAtLastError() );
+}
+#define inst_set_cuda(T) template void Context::set_cuda(TileP<T> t, const T a)
+instantiate_template(inst_set_cuda)
 
 // expands to, e.g.:
 // cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, C->m,C->n,A->n,

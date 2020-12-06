@@ -110,7 +110,7 @@ void compute_tile(Matrix<value_t> &X, TileP<value_t> out, int64_t ti, int64_t tj
  */
 template <typename T>
 void set_local(Matrix<T> &S, TileP<T> out, int64_t ti, int64_t tj) {
-    if(! S.mpi.cart.active()) return;
+    if(! S.mpi.active()) return;
 
     int64_t i = ti*S.mpi.cart.p + S.mpi.cart.i; // local to global tile index
     int64_t j = tj*S.mpi.cart.q + S.mpi.cart.j;
@@ -230,16 +230,22 @@ int main(int argc, char *argv[]) {
 
     int ret = 0;
 
-    if(mpi.rank == 0)
-        printf("Host\n");
-#define call_test(value_t) ret += test<value_t>(m,n,mbs,nbs,cX,cS,Place::Host)
-    instantiate_template(call_test)
+    if(nbs < 1024 || mbs < 1024) {
+        if(mpi.rank == 0)
+            printf("Host\n");
+        #define call_test(value_t) ret += test<value_t>(m,n,mbs,nbs,cX,cS,Place::Host)
+        instantiate_template(call_test)
+    }
 
     #ifdef ENABLE_CUDA
     if(mpi.rank == 0)
         printf("CUDA\n");
-#define call_test2(value_t) ret += test<value_t>(m,n,mbs,nbs,cX,cS,Place::CUDA)
-    instantiate_template(call_test2)
+    #define call_test2(value_t) ret += test<value_t>(m,n,mbs,nbs,cX,cS,Place::CUDA)
+    if(nbs < 1024 || mbs < 1024) {
+        instantiate_template(call_test2)
+    } else {
+        call_test2(float);
+    }
     #endif
 
     return ret;
