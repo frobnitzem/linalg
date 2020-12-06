@@ -46,6 +46,11 @@ struct MPIH {
 
     MPIH() : rank(-1), ranks(0), comm(nullptr), pcomm(&comm, MPIH::free_comm) { }
 
+    ///* Is this rank active?
+    bool active() const {
+        return comm != MPI_COMM_NULL;
+    }
+
     private:
     MPIp pcomm;
 
@@ -70,10 +75,6 @@ struct CartGroup : MPIH {
         int coords[2];
     };
 
-    ///* Is this rank active?
-    bool active() {
-        return comm != MPI_COMM_NULL;
-    }
     /**
      * Create a new subgroup containing ranks start .. start+p*q-1
      */
@@ -139,6 +140,10 @@ struct NCCLH {
 
     NCCLH(const MPIH &mpi, ContextP _ctxt) : ctxt(_ctxt), pncom(&ncom, NCCLH::dtor) {
         ncclUniqueId id;
+        if(! mpi.active() ) {
+            ncom = nullptr;
+            return;
+        }
         if(mpi.rank == 0) CHECKNCCL( ncclGetUniqueId(&id) );
         CHECKMPI( MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, mpi.comm) );
         CHECKNCCL( ncclCommInitRank(&ncom, mpi.ranks, id, mpi.rank) );
@@ -149,7 +154,8 @@ struct NCCLH {
     private:
     std::shared_ptr<ncclComm_t> pncom;
     static void dtor(ncclComm_t *p) {
-        CHECKNCCL( ncclCommDestroy(*p) );
+        if(*p != nullptr)
+            CHECKNCCL( ncclCommDestroy(*p) );
     }
     #endif
 };

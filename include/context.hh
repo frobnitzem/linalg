@@ -46,7 +46,7 @@ struct Context {
     void set(TileView<value_t> A, const value_t a) { set(A.t, a); };
 
     template <typename value_t>
-    void copy(TileP<value_t> dst, TileP<value_t>src);
+    void copy(TileP<value_t> dst, const TileP<value_t>src);
     template <typename dst_t, typename src_t>
     void copy(TileView<dst_t> dst, const TileView<src_t> src);
 

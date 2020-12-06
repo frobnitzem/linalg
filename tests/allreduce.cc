@@ -25,19 +25,21 @@ int test(int64_t m, int64_t n, int64_t stride, Linalg::Comm &c, const Linalg::Pl
     if(c.rank == 0)
         print_times(results, sizeof(T)*stride*n / (1024.*1024));
 
+    double ans0 = std::pow(c.ranks, ntest);
     auto B = std::make_shared<Linalg::Tile<T> >(m, n, stride, Linalg::Place::Host);
-    c.ctxt->set<T>(B, std::pow(c.ranks, ntest));
+    c.ctxt->set<T>(B, ans0);
     Linalg::TileP<T> Ax = A;
     if(loc == Linalg::Place::CUDA) {
         Ax = std::make_shared<Linalg::Tile<T> >(m, n, stride, Linalg::Place::Host);
         c.ctxt->copy(Ax, A);
     }
-    /*if(c.rank == 0)
-        printf("ans = %f, expected %f\n", std::abs(Ax->at(0,0)), std::abs(B->at(0,0)));*/
     c.ctxt->sync();
     double err = nrm(Ax, B);
+    bool ret = err > ans0*max_epsilon<T>();
+    if(ret && c.rank == 0)
+        printf("ans = %f, expected %f\n", std::abs(Ax->at(0,0)), std::abs(B->at(0,0)));
 
-    return err > 1e-18;
+    return ret;
 }
 
 int main(int argc, char *argv[]) {

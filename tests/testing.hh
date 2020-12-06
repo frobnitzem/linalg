@@ -2,6 +2,7 @@
 #include <cmath>
 #include <bits/stdc++.h>
 #include <vector>
+#include <limits>
 
 #define setup(m,n,k) \
     int64_t m = 100, n = 200, k = 50; \
@@ -10,6 +11,11 @@
         n = atol(argv[2]); \
         k = atol(argv[3]); \
     }
+
+template <typename T>
+typename is_complex_t<T>::value_type max_epsilon() {
+    return std::numeric_limits< typename is_complex_t<T>::value_type >::epsilon();
+}
 
 void print_times(std::vector<double> &results, double gflop) {
     sort(results.begin(), results.end());

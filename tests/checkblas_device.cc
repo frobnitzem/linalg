@@ -4,20 +4,15 @@
 #include <stdio.h>
 #include <omp.h>
 #include <blas/flops.hh>
-
-template< typename T >
-inline T roundup( T x, T y ) {
-    return T( (x + y - 1) / y ) * y;
-}
+#include "testing.hh"
 
 //------------------------------------------------------------------------------
 template <typename T>
-void run( int m, int n, int k, blas::Device device ) {
+int run( int m, int n, int k, blas::Device device ) {
     int align = 1;
     int64_t lda = roundup( m, align );
     int64_t ldb = roundup( k, align );
     int64_t ldc = roundup( m, align );
-
 
     // device specifics
     blas::Queue queue(device, 0);
@@ -51,27 +46,37 @@ void run( int m, int n, int k, blas::Device device ) {
 
     blas::device_getmatrix(m, n, dC, ldc, C.data(), ldc, queue);
     queue.sync();
+
     blas::device_free( dA );
     blas::device_free( dB );
     blas::device_free( dC );
+
+    double ans0 = 3.0 - 2.0*k;
+    double err = is_complex_t<T>::real(C[0]) - ans0;
+    bool ret = err > max_epsilon<T>();
+    if(ret)
+        printf("Result = %f, expected = %f, err = %g\n", is_complex_t<T>::real(C[0]), ans0, err);
+
+    return ret;
 }
 
 //------------------------------------------------------------------------------
 int main( int argc, char** argv ) {
+    int err = 0;
     blas::Device device = 0;
 
     int m = 100, n = 200, k = 50;
     printf( "run< float >( %d, %d, %d )\n", m, n, k );
-    run< float  >( m, n, k, device );
+    err += run< float  >( m, n, k, device );
 
     printf( "run< double >( %d, %d, %d )\n", m, n, k );
-    run< double >( m, n, k, device );
+    err += run< double >( m, n, k, device );
 
     printf( "run< complex<float> >( %d, %d, %d )\n", m, n, k );
-    run< std::complex<float>  >( m, n, k, device );
+    err += run< std::complex<float>  >( m, n, k, device );
 
     printf( "run< complex<double> >( %d, %d, %d )\n", m, n, k );
-    run< std::complex<double> >( m, n, k, device );
+    err += run< std::complex<double> >( m, n, k, device );
 
-    return 0;
+    return err;
 }

@@ -134,7 +134,7 @@ instantiate_template(inst_gemmV)
  * It allows unequal column-strides.
  */
 template <typename value_t>
-void Context::copy(TileP<value_t> dst, TileP<value_t>src) {
+void Context::copy(TileP<value_t> dst, const TileP<value_t>src) {
     blas_error_if_msg(dst->m != src->m || dst->n != src->n,
                       "copy requires identical tile dimensions");
     switch(dst->loc) {
