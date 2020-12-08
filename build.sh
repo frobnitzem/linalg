@@ -7,11 +7,19 @@
 COMPILER=$(module list gcc 2>&1 | sed -n -e 's/.*gcc\//gcc@/p')
 CUDA=$(module list cuda 2>&1 | sed -n -e 's/.*cuda\//cuda@/p')
 CUDA_ARCH=70
+if [[ x$COMPILER == x"" ]]; then
+    COMPILER=gcc@8.4.0
+    CUDA=cuda@11.1.0
+    CUDA_ARCH=75
+fi
 
 # build blaspp with $SPACK install -v --no-cache -j4 blaspp@2020.10.02 % $COMPILER +cuda cuda_arch=$CUDA_ARCH ^$CUDA ^openblas+ilp64 threads=openmp
 # build nccl with $SPACK install -v -j4 --no-cache nccl % $COMPILER +cuda cuda_arch=$CUDA_ARCH ^$CUDA
 
-SPACK=/gpfs/alpine/proj-shared/eng110/spack/bin/spack
+SPACK=`which spack`
+if [[ x$SPACK == x"" ]]; then
+  SPACK=/gpfs/alpine/proj-shared/eng110/spack/bin/spack
+fi
 LOCALROOT=$PWD/build/inst
 BLASPP=$($SPACK find --format '{prefix}' blaspp@2020.10.02 % $COMPILER)
 NCCL=$($SPACK find --format '{prefix}' nccl % $COMPILER)

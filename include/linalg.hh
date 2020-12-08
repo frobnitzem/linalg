@@ -11,6 +11,7 @@
 #include <vector>
 #include <deque>
 #include <map>
+#include <mutex>
 
 #include <mpi.h>
 #include <omp.h>
@@ -52,6 +53,7 @@ inline void BlockCyclic(const int64_t N,  // number of rows
         //    then this processor does not participate in the last super-tile
 }
 
+#include "event.hh"
 #include "tile.hh"
 #include "context.hh"
 #include "comm.hh"

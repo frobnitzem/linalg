@@ -6,7 +6,8 @@
 // stubs
     #define CHECKCUDA(cmd)   assert(0);
     #define CHECKCUBLAS(cmd) assert(0);
-
+    // remove this call if not using CUDA
+    #define CHECK0CUDA(cmd)
 #else // ENABLE_CUDA
 
 #include <cuda_runtime.h>
@@ -20,6 +21,8 @@
     exit(EXIT_FAILURE);                             \
   }                                                 \
 } while(0)
+#define CHECK0CUDA(cmd) CHECKCUDA(cmd)
+
 static const char* _cublasGetErrorString(cublasStatus_t status) {
     switch(status) {
         case CUBLAS_STATUS_SUCCESS: return "CUBLAS_STATUS_SUCCESS";

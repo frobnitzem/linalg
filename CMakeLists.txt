@@ -28,6 +28,7 @@ set(LINALG_HEADERS
     include/linalg.hh
     include/linalg_cuda.hh
     include/linalg_nccl.hh
+    include/event.hh
     include/tile.hh
     include/comm.hh
     include/matrix.hh

@@ -7,8 +7,15 @@
 
 COMPILER=$(module list gcc 2>&1 | sed -n -e 's/.*gcc\//gcc@/p')
 CUDA=$(module list cuda 2>&1 | sed -n -e 's/.*cuda\//cuda@/p')
+if [[ x$COMPILER == x"" ]]; then
+    COMPILER=gcc@8.4.0
+    CUDA=cuda@11.1.0
+fi
 
-SPACK=/gpfs/alpine/proj-shared/eng110/spack/bin/spack
+SPACK=`which spack`
+if [[ x$SPACK == x"" ]]; then
+  SPACK=/gpfs/alpine/proj-shared/eng110/spack/bin/spack
+fi
 LOCALROOT="$PWD/../build/inst"
 BLASPP=$($SPACK find --format '{prefix}' blaspp@2020.10.02 % $COMPILER)
 NCCL=$($SPACK find --format '{prefix}' nccl % $COMPILER)
