@@ -1,5 +1,6 @@
 #include <linalg.hh>
 #include <math.h>
+#include <utility>
 
 using namespace Linalg;
 
@@ -116,7 +117,7 @@ void set_local(Matrix<T> &S, TileP<T> out, int64_t ti, int64_t tj) {
     int64_t j = tj*S.mpi.cart.q + S.mpi.cart.j;
     if(i >= S.mtile || j >= S.ntile) return; // last row/col
 
-    Timed timer("Copy Tile", S.inTileMb(i)*S.inTileNb(j)/(1024.*1024*1024), S.mpi);
+    //Timed timer("Copy Tile", S.inTileMb(i)*S.inTileNb(j)/(1024.*1024*1024), S.mpi);
 
     int64_t start_m = S.inTileMb(0)*S.mpi.cart.i; // assume const block size
     int64_t start_n = S.inTileNb(0)*S.mpi.cart.j;
@@ -146,9 +147,10 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
     auto S = newMatrix<T>(n, n, nbs, nbs, cS, loc);
     auto B = S.alloc(nbs);
 
-    auto out = std::make_shared<Tile<T> >(nbs*S.mpi.cart.p, nbs*S.mpi.cart.q, 1, loc);
+    auto o1 = std::make_shared<Tile<T> >(nbs*S.mpi.cart.p, nbs*S.mpi.cart.q, 1, loc);
+    auto o2 = std::make_shared<Tile<T> >(nbs*S.mpi.cart.p, nbs*S.mpi.cart.q, 1, loc);
     if(progress)
-        printf("Rank %d: out = %ld %ld @ %p\n", cX.rank, out->m, out->n, out->data);
+        printf("Rank %d: out = %ld %ld @ %p\n", cX.rank, o1->m, o1->n, o1->data);
 
     const int ntest = 5;
     std::vector<double> results(ntest);
@@ -161,23 +163,45 @@ int test(int64_t m, int64_t n, int64_t mbs, int64_t nbs, CartComm &cX, CartComm 
                 X.ntile, S.mpi.cart.q);
 
     for(int i=0; i<ntest; i++) {
+        Event a[2], b[2]; // Events, named after recording process.
         double time = omp_get_wtime();
-        // compute the lower triangular part of S
-        for(int64_t tj=0; tj < roundup(S.ntile,S.mpi.cart.q)/S.mpi.cart.q; tj++) {
-            for(int64_t ti=tj; ti < roundup(S.mtile,S.mpi.cart.p)/S.mpi.cart.p; ti++) {
-                if(progress)
-                    printf("Rank %d: compute tile %ld %ld\n", X.mpi.rank, ti, tj);
-                compute_tile(X, out, ti, tj);
-                if(progress)
-                    printf("Rank %d: reduce tile %ld %ld (%d)\n", X.mpi.rank, ti, tj, out->data == out->data);
-                {
-                Timed timer("Allreduce Tile", out->m*out->n/(1024.*1024*1024), X.mpi);
-                X.mpi.allreduce_sum(out, out);
+        int64_t np = roundup(S.mtile,S.mpi.cart.p)/S.mpi.cart.p;
+        int64_t nq = roundup(S.ntile,S.mpi.cart.q)/S.mpi.cart.q;
+
+        #pragma omp parallel num_threads(2)
+        {
+            int thread = omp_get_thread_num();
+            int threads = omp_get_num_threads();
+            std::shared_ptr<Tile<T> > out[2] = {o1, o2};
+            int64_t k = 0;
+            #ifdef ENABLE_CUDA
+            cudaStream_t stream = cX.ctxt->get_queue().stream();
+            #else
+            cudaStream_t stream = nullptr;
+            #endif
+
+            // compute the lower triangular part of S
+            for(int64_t tj=0; tj < nq; tj++) {
+                for(int64_t ti=tj; ti < np; ti++,k++) {
+                    if(threads != 2 || thread == 0) {
+                        if(k > 1) b[k%2].wait(stream);
+
+                        if(progress)
+                            printf("Rank %d: compute tile %ld %ld\n", X.mpi.rank, ti, tj);
+                        compute_tile(X, out[k%2], ti, tj);
+                        a[k%2].record(stream);
+                    }
+                    if(threads != 2 || thread == 1) {
+                        a[k%2].wait(stream);
+                        if(progress)
+                            printf("Rank %d: reduce/copy tile %ld %ld\n", X.mpi.rank, ti, tj);
+                        Timed timer("Allreduce+Copy Tile", o1->m*o1->n/(1024.*1024*1024), X.mpi);
+                        X.mpi.allreduce_sum(out[k%2], out[k%2]);
+                        set_local(S, out[k%2], ti, tj);
+                        b[k%2].record(stream);
+                    }
+                    // optional: out.conjTrans and set_local(S,out,tj,ti) [ ti != tj ]
                 }
-                if(progress)
-                    printf("Rank %d: copy tile %ld %ld\n", X.mpi.rank, ti, tj);
-                set_local(S, out, ti, tj);
-                // optional: out.conjTrans and set_local(S,out,tj,ti) [ ti != tj ]
             }
         }
         if(progress)
