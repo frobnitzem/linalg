@@ -14,10 +14,10 @@ fi
 
 SPACK=`which spack`
 if [[ x$SPACK == x"" ]]; then
-  SPACK=/gpfs/alpine/proj-shared/eng110/spack/bin/spack
+  SPACK=/gpfs/alpine/world-shared/stf006/rogersdd/spack/bin/spack
 fi
-LOCALROOT="$PWD/../build/inst"
-BLASPP=$($SPACK find --format '{prefix}' blaspp@2020.10.02 % $COMPILER)
+LOCALROOT="$PWD/../inst"
+BLASPP=$($SPACK find --format '{prefix}' blaspp % $COMPILER)
 NCCL=$($SPACK find --format '{prefix}' nccl % $COMPILER)
 CUDAToolkit_ROOT=$($SPACK find --format '{prefix}' $CUDA % $COMPILER)
 
