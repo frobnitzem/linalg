@@ -1,16 +1,8 @@
 #!/bin/bash
 # build the example program against this library
 
-#module purge
-#module load gcc/8.1.1 cmake/3.18 spectrum-mpi cuda/11.1.1
-#module load gcc/6.4.0 cmake/3.18 spectrum-mpi cuda/10.2.89
-
-COMPILER=$(module list gcc 2>&1 | sed -n -e 's/.*gcc\//gcc@/p')
-CUDA=$(module list cuda 2>&1 | sed -n -e 's/.*cuda\//cuda@/p')
-if [[ x$COMPILER == x"" ]]; then
-    COMPILER=gcc@8.4.0
-    CUDA=cuda@11.1.0
-fi
+COMPILER=gcc@10.2.0
+CUDA=cuda@11.2.0
 
 SPACK=`which spack`
 if [[ x$SPACK == x"" ]]; then

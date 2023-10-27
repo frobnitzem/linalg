@@ -226,7 +226,7 @@ int mat_dim(int ranks, int max) {
 
 int main(int argc, char *argv[]) {
     //int64_t m = 100000; // 4 GB of doubles
-    //int64_t n = 5000;
+    //int64_t n =   5000;
     //int64_t m = 10000; // 40 MB of doubles
     int64_t m = 1000; // 40 MB of doubles
     int64_t n = 500;
@@ -235,10 +235,10 @@ int main(int argc, char *argv[]) {
     int64_t nbs = 128;
 
     if(argc == 5) {
-        m = atol(argv[1]);
-        n = atol(argv[2]);
-        mbs = atol(argv[3]);
-        nbs = atol(argv[4]);
+        mbs = atol(argv[1]);
+        nbs = atol(argv[2]);
+        m = atol(argv[3]) * mbs;
+        n = atol(argv[4]) * nbs;
     }
 
     MPIH      mpi(&argc, &argv);
